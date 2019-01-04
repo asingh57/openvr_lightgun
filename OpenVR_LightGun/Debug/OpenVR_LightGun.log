@@ -1,5 +1,9 @@
 ﻿  OpenVR_LightGun.cpp
-d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(449): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(403): warning C4101: 'event': unreferenced local variable
-d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(476): warning C4172: returning address of local variable or temporary: coordinates
+d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(440): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(414): warning C4101: 'event': unreferenced local variable
+d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(500): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(568): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(569): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(596): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(503): warning C4172: returning address of local variable or temporary: ret_value
   OpenVR_LightGun.vcxproj -> D:\openvr_lightgun\OpenVR_LightGun\Debug\OpenVR_LightGun.exe

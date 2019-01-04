@@ -2,7 +2,6 @@
 //
 
 #include "pch.h"
-#include <iostream>
 #include <stdlib.h>
 #include "../openvr/headers/openvr.h"
 #pragma comment(lib, "../openvr/lib/win32/openvr_api.lib")
@@ -15,6 +14,7 @@
 #include <set>
 #include <stdio.h>
 #include <tchar.h>
+#include <math.h> 
 
 
 
@@ -43,6 +43,16 @@ string ftos(float f, int precision);	// float to string with 2-decimal precision
 string vftos(float v[3], int precision);	// float vector to string with 2-decimal precisions
 string GetTrackedDeviceString(vr::IVRSystem*, vr::TrackedDeviceIndex_t, vr::TrackedDeviceProperty, vr::TrackedPropertyError *peError = NULL);
 string GetTrackedDeviceClassString(vr::ETrackedDeviceClass td_class);
+
+
+
+float dot_product(float v1[3], float v2[3]);
+void multiplyMatrices(float *firstMatrix[3], float *secondMatrix[3], float *mult[3]);
+void vector_scalar_mult(float *x[3], float scalar);
+void sum_matrix(float **x, float **y);//x will be updated
+float **get_rotation_matrix(float f[3], float t[3]);// rotation of a into b
+
+
 
 
 vr::IVRSystem* vr_context;
@@ -74,26 +84,26 @@ int main()
 	{
 
 		for (;;) {
-			cout << "Please select the device number you would like to use as light_gun" << endl;
+			std::cout << "Please select the device number you would like to use as light_gun" << endl;
 			int device_number;
 			cin >> device_number;
 			if (available_controllers.find(device_number) == available_controllers.end()) {
-				cout << "Invalid device number" << endl;
+				std::cout << "Invalid device number" << endl;
 				continue;
 			}
 
 			if (!screen_coordinates_configured) {
 				for (;;) {
 
-					cout << "Please bring the controller to the top left edge of the screen and press the trigger" << endl;
+					std::cout << "Please bring the controller to the top left edge of the screen and press the trigger" << endl;
 					screen_plane[0][0] = get_coordinate_trigger_press(device_number);
-					cout << "Please bring the controller to the top right edge of the screen and press the trigger" << endl;
+					std::cout << "Please bring the controller to the top right edge of the screen and press the trigger" << endl;
 					screen_plane[0][1] = get_coordinate_trigger_press(device_number);
-					cout << "Please bring the controller to the bottom left edge of the screen and press the trigger" << endl;
+					std::cout << "Please bring the controller to the bottom left edge of the screen and press the trigger" << endl;
 					screen_plane[1][0] = get_coordinate_trigger_press(device_number);
-					cout << "Please bring the controller to the bottom right edge of the screen and press the trigger" << endl;
+					std::cout << "Please bring the controller to the bottom right edge of the screen and press the trigger" << endl;
 					screen_plane[1][1] = get_coordinate_trigger_press(device_number);
-					cout << "Press x to recalibrate, otherwise press any key to continue" << endl;
+					std::cout << "Press x to recalibrate, otherwise press any key to continue" << endl;
 					char response;
 					cin >> response;
 					if (response != 'x') {
@@ -104,7 +114,7 @@ int main()
 				screen_coordinates_configured = true;
 			}
 
-			cout << "Select enter a com port number for this light_gun(you can find this in windows device manager)" << endl;
+			std::cout << "Select enter a com port number for this light_gun(you can find this in windows device manager)" << endl;
 			int com_port;
 			cin >> com_port;
 
@@ -120,11 +130,11 @@ int main()
 
 			while (cont_statement) {
 				cont_statement = false;
-				cout << "would you like to add another controller? (y or n)" << endl;
+				std::cout << "would you like to add another controller? (y or n)" << endl;
 				cin >> response;	
 				if (response != 'y'&&response != 'n') {
 					cont_statement = true;
-					cout << "Invalid input" << endl;
+					std::cout << "Invalid input" << endl;
 				}
 			}
 			if (response == 'n') {
@@ -133,7 +143,7 @@ int main()
 		}
 		
 		for (;;) {
-			cout << "mouse emulation running, to end emulation, enter \"end\" " << endl;
+			std::cout << "mouse emulation running, to end emulation, enter \"end\" " << endl;
 			string end_command;
 			cin >> end_command;
 			if (end_command=="end") {
@@ -143,7 +153,7 @@ int main()
 				//break;
 			}
 			else {
-				cout << "invalid command" << endl;
+				std::cout << "invalid command" << endl;
 			}
 
 
@@ -163,28 +173,28 @@ int init_OpenVR()
 	// Check whether there is an HMD plugged-in and the SteamVR runtime is installed
 	if (vr::VR_IsHmdPresent())
 	{
-		cout << "An HMD was successfully found in the system" << endl;
+		std::cout << "An HMD was successfully found in the system" << endl;
 
 		if (vr::VR_IsRuntimeInstalled()) {
 			const char* runtime_path = vr::VR_RuntimePath();
-			cout << "Runtime correctly installed at '" << runtime_path << "'" << endl;
+			std::cout << "Runtime correctly installed at '" << runtime_path << "'" << endl;
 		}
 		else
 		{
-			cout << "Runtime was not found, quitting app" << endl;
+			std::cout << "Runtime was not found, quitting app" << endl;
 			return -1;
 		}
 	}
 	else
 	{
-		cout << "No HMD was found in the system, quitting app" << endl;
+		std::cout << "No HMD was found in the system, quitting app" << endl;
 		return -1;
 	}
 
 	// Load the SteamVR Runtime
 	vr::HmdError err;
 	vr_context = vr::VR_Init(&err, vr::EVRApplicationType::VRApplication_Scene);
-	vr_context == NULL ? cout << "Error while initializing SteamVR runtime. Error code is " << vr::VR_GetVRInitErrorAsSymbol(err) << endl : cout << "SteamVR runtime successfully initialized" << endl;
+	vr_context == NULL ? std::cout << "Error while initializing SteamVR runtime. Error code is " << vr::VR_GetVRInitErrorAsSymbol(err) << endl : std::cout << "SteamVR runtime successfully initialized" << endl;
 
 	// Obtain some basic information given by the runtime
 	int base_stations_count = 0;
@@ -198,8 +208,8 @@ int init_OpenVR()
 			tracked_device_type[td] = td_type;
 
 			if (td_type=="controller") {
-				cout << "Tracking device " << td << " is connected " << endl;
-				cout << "  Device type: " << td_type << ". Name: " << GetTrackedDeviceString(vr_context, td, vr::Prop_TrackingSystemName_String) << endl;
+				std::cout << "Tracking device " << td << " is connected " << endl;
+				std::cout << "  Device type: " << td_type << ". Name: " << GetTrackedDeviceString(vr_context, td, vr::Prop_TrackingSystemName_String) << endl;
 				available_controllers.insert(td);
 			}
 
@@ -218,7 +228,7 @@ int init_OpenVR()
 	// Check whether both base stations are found, not mandatory but just in case...
 	if (base_stations_count < 2)
 	{
-		cout << "There was a problem indentifying the base stations, please check they are powered on" << endl;
+		std::cout << "There was a problem indentifying the base stations, please check they are powered on" << endl;
 
 		return -1;
 	}
@@ -235,43 +245,43 @@ void process_vr_event(const vr::VREvent_t & event)
 	{
 	case vr::VREvent_TrackedDeviceActivated:
 	{
-		cout << "Device " << event.trackedDeviceIndex << " attached (" << str_td_class << ")" << endl;
+		std::cout << "Device " << event.trackedDeviceIndex << " attached (" << str_td_class << ")" << endl;
 		tracked_device_type[event.trackedDeviceIndex] = str_td_class;
 	}
 	break;
 	case vr::VREvent_TrackedDeviceDeactivated:
 	{
-		cout << "Device " << event.trackedDeviceIndex << " detached (" << str_td_class << ")" << endl;
+		std::cout << "Device " << event.trackedDeviceIndex << " detached (" << str_td_class << ")" << endl;
 		tracked_device_type[event.trackedDeviceIndex] = "";
 	}
 	break;
 	case vr::VREvent_TrackedDeviceUpdated:
 	{
-		cout << "Device " << event.trackedDeviceIndex << " updated (" << str_td_class << ")" << endl;
+		std::cout << "Device " << event.trackedDeviceIndex << " updated (" << str_td_class << ")" << endl;
 	}
 	break;
 	case vr::VREvent_ButtonPress:
 	{
 		vr::VREvent_Controller_t controller_data = event.data.controller;
-		cout << "Pressed button " << vr_context->GetButtonIdNameFromEnum((vr::EVRButtonId) controller_data.button) << " of device " << event.trackedDeviceIndex << " (" << str_td_class << ")" << endl;
+		std::cout << "Pressed button " << vr_context->GetButtonIdNameFromEnum((vr::EVRButtonId) controller_data.button) << " of device " << event.trackedDeviceIndex << " (" << str_td_class << ")" << endl;
 	}
 	break;
 	case vr::VREvent_ButtonUnpress:
 	{
 		vr::VREvent_Controller_t controller_data = event.data.controller;
-		cout << "Unpressed button " << vr_context->GetButtonIdNameFromEnum((vr::EVRButtonId) controller_data.button) << " of device " << event.trackedDeviceIndex << " (" << str_td_class << ")" << endl;
+		std::cout << "Unpressed button " << vr_context->GetButtonIdNameFromEnum((vr::EVRButtonId) controller_data.button) << " of device " << event.trackedDeviceIndex << " (" << str_td_class << ")" << endl;
 	}
 	break;
 	case vr::VREvent_ButtonTouch:
 	{
 		vr::VREvent_Controller_t controller_data = event.data.controller;
-		cout << "Touched button " << vr_context->GetButtonIdNameFromEnum((vr::EVRButtonId) controller_data.button) << " of device " << event.trackedDeviceIndex << " (" << str_td_class << ")" << endl;
+		std::cout << "Touched button " << vr_context->GetButtonIdNameFromEnum((vr::EVRButtonId) controller_data.button) << " of device " << event.trackedDeviceIndex << " (" << str_td_class << ")" << endl;
 	}
 	break;
 	case vr::VREvent_ButtonUntouch:
 	{
 		vr::VREvent_Controller_t controller_data = event.data.controller;
-		cout << "Untouched button " << vr_context->GetButtonIdNameFromEnum((vr::EVRButtonId) controller_data.button) << " of device " << event.trackedDeviceIndex << " (" << str_td_class << ")" << endl;
+		std::cout << "Untouched button " << vr_context->GetButtonIdNameFromEnum((vr::EVRButtonId) controller_data.button) << " of device " << event.trackedDeviceIndex << " (" << str_td_class << ")" << endl;
 	}
 	break;
 	}
@@ -393,8 +403,8 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 	bool tracking_values_available;
 	float *matrix[3];
 	POINT cursor_position;
-	cout << "Position controller "+ std::to_string(device_number) +" directly onto the cursor, pointing directly at the tip of the cursor and press trigger";
-	float *direction_vector_cursor_controller; //direction vector of controller
+	std::cout << "Position controller "+ std::to_string(device_number) +" directly onto the cursor, pointing directly at the tip of the cursor and press trigger";
+	float *direction_vector_cursor_controller = new float[3]; //direction vector of controller
 	float *abs_position_controller_cursor = get_coordinate_trigger_press(device_number, direction_vector_cursor_controller);//x,y,z coordinates
 	GetCursorPos(&cursor_position);
 
@@ -428,7 +438,7 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 			float abs_position[3] = { matrix[0][3], matrix[1][3], matrix[2][3] };// absolute position vector of device;
 			//find direction vector from obtained rotation matrix
 			float sqrt_magnitude = sqrt(1 / 3.00);
-			cout << "Device " << device_number << endl << " Controller coordinates(" << abs_position[0] << "," << abs_position[1] << "," << abs_position[2] << ")" << endl;
+			std::cout << "Device " << device_number << endl << " Controller coordinates(" << abs_position[0] << "," << abs_position[1] << "," << abs_position[2] << ")" << endl;
 			float direction_vector[3] = { (matrix[0][0] + matrix[1][0] + matrix[2][0]) * sqrt_magnitude, (matrix[0][1] + matrix[1][1] + matrix[2][1]) * sqrt_magnitude,(matrix[0][2] + matrix[1][2] + matrix[2][2]) * sqrt_magnitude };
 			float vector_magnitude = pow(direction_vector[0], 2) + pow(direction_vector[1], 2) + pow(direction_vector[2], 2);
 			
@@ -447,7 +457,7 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 		
 		Sleep(500);//expected polling rate of 200Hz
 		if (check_end_signal()) {//if end signal received, end thread
-			cout << "thread for device "<< device_number << " ended" << endl;
+			std::cout << "thread for device "<< device_number << " ended" << endl;
 			return;
 		}
 	}
@@ -456,7 +466,7 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 }
 
 
-float *get_coordinate_trigger_press(int device_number, float *recv_direction_vector = {}) { //get controller coordinates on trigger press 
+float *get_coordinate_trigger_press(int device_number, float *recv_direction_vector) { //get controller coordinates on trigger press 
 	float *matrix[3];
 
 	for (;;) {
@@ -496,6 +506,170 @@ float *get_coordinate_trigger_press(int device_number, float *recv_direction_vec
 
 			}
 		}
+
+	}
+}
+
+
+
+
+
+float dot_product(float v1[3], float v2[3]) {
+	return v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
+}
+
+void multiplyMatrices(float **firstMatrix, float **secondMatrix, float **mult)
+{
+	int i, j, k;
+	// Initializing elements of matrix mult to 0.
+	for (i = 0; i < 3; ++i)
+	{
+		for (j = 0; j < 3; ++j)
+		{
+			mult[i][j] = 0;
+		}
+	}
+
+	// Multiplying matrix firstMatrix and secondMatrix and storing in array mult.
+	for (i = 0; i < 3; ++i)
+	{
+		for (j = 0; j < 3; ++j)
+		{
+
+			for (k = 0; k < 3; ++k)
+			{
+				mult[i][j] += (firstMatrix[i][k] * secondMatrix[k][j]);
+			}
+		}
+	}
+}
+
+
+
+void vector_scalar_mult(float **x, float scalar) {
+	for (int i = 0; i < 3; ++i)
+		for (int j = 0; j < 3; ++j)
+		{
+			x[i][j] = x[i][j] * scalar;
+		}
+}
+
+void sum_matrix(float **x, float **y) {//x will be updated
+	for (int i = 0; i < 3; ++i)
+		for (int j = 0; j < 3; ++j)
+		{
+			x[i][j] = x[i][j] + y[i][j];
+		}
+}
+
+
+float **get_rotation_matrix(float f[3], float t[3]) {// rotation of a into b
+
+	float mag_f = pow((pow(f[0], 2) + pow(f[1], 2) + pow(f[2], 2)), 0.5);
+	float mag_t = pow((pow(t[0], 2) + pow(t[1], 2) + pow(t[2], 2)), 0.5);
+
+	std::cout << "mag_f=" << mag_f << endl;
+	std::cout << "mag_t=" << mag_t << endl;
+
+	f[0] = f[0] / mag_f;
+	f[1] = f[1] / mag_f;
+	f[2] = f[2] / mag_f;
+	t[0] = t[0] / mag_t;
+	t[1] = t[1] / mag_t;
+	t[2] = t[2] / mag_t;
+
+
+	std::cout << "new vector f=" << f[0] << "," << f[1] << "," << f[2] << endl;
+	std::cout << "new vector t=" << t[0] << "," << t[1] << "," << t[2] << endl;
+
+	float v[3];
+	float s;
+
+
+	v[0] = (f[1] * t[2]) - (f[2] * t[1]);
+	v[1] = -((f[0] * t[2]) - (f[2] * t[0]));
+	v[2] = (f[0] * t[1]) - (f[1] * t[0]);
+
+	std::cout << "v=aXb=" << v[0] << "," << v[1] << "," << v[2] << endl;
+
+
+	s = pow((pow(v[0], 2) + pow(v[1], 2) + pow(v[2], 2)), 0.5);
+	std::cout << "sin value=" << s << endl;
+
+
+
+	float c = dot_product(f, t);
+	std::cout << "cos value=" << c << endl;
+
+
+	float** u_hat;
+	float** u_hat_sq;
+	float** identity;
+	u_hat = new float*[3];
+	u_hat_sq = new float*[3];
+	identity = new float*[3];
+	for (int i = 0; i < 3; i++) {
+		u_hat[i] = new float[3];
+		u_hat_sq[i] = new float[3];
+		identity[i] = new float[3];
+		for (int j = 0; j < 3; j++) {
+			u_hat[i][j] = 0;
+			if (i == j) {
+				identity[i][j] = 1;
+			}
+			else {
+				identity[i][j] = 0;
+			}
+		}
+	}
+	std::cout << "Identity Matrix" << endl;
+	for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 3; j++) {
+			std::cout << identity[i][j] << " ";
+		}
+		std::cout << endl;
+	}
+
+
+
+	u_hat[0][1] = -v[2];
+	u_hat[1][0] = v[2];
+	u_hat[0][2] = v[1];
+	u_hat[2][0] = -v[1];
+	u_hat[1][2] = -v[0];
+	u_hat[2][1] = v[0];
+
+
+
+
+	multiplyMatrices(u_hat, u_hat, u_hat_sq);
+	std::cout << "u_hat Matrix" << endl;
+	for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 3; j++) {
+			std::cout << u_hat[i][j] << " ";
+		}
+		std::cout << endl;
+	}
+	std::cout << "u_hat square" << endl;
+	for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 3; j++) {
+			std::cout << u_hat_sq[i][j] << " ";
+		}
+		std::cout << endl;
+	}
+
+
+
+	vector_scalar_mult(u_hat_sq, (1 / (1 + c)));
+
+
+
+	sum_matrix(u_hat_sq, u_hat);
+	sum_matrix(u_hat_sq, identity);
+
+
+	return u_hat_sq;
+
 
 
 }
