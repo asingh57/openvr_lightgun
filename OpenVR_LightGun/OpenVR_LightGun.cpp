@@ -13,6 +13,13 @@
 #include <sstream> // stringstream
 #include <mutex>
 #include <set>
+#include <stdio.h>
+#include <tchar.h>
+
+
+
+
+
 
 using namespace std;
 using namespace vr;
@@ -24,8 +31,7 @@ std::mutex end_signal_mutex;
 bool end_signal=false;
 std::mutex tracking_device_mutex;
 float *screen_plane[2][2];
-POINT cursor_position;                // previous cursor location 
-
+float screen_normal_unit_vector[2];
 
 
 
@@ -40,7 +46,6 @@ string GetTrackedDeviceClassString(vr::ETrackedDeviceClass td_class);
 
 
 vr::IVRSystem* vr_context;
-vr::TrackedDevicePose_t tracked_device_pose[vr::k_unMaxTrackedDeviceCount];
 
 bool app_end = false;
 string driver_name, driver_serial;
@@ -49,7 +54,7 @@ string tracked_device_type[vr::k_unMaxTrackedDeviceCount];
 int init_OpenVR();
 void process_vr_event(const vr::VREvent_t & event);
 void exit();
-float *get_coordinate_trigger_press(int device_number);
+float *get_coordinate_trigger_press(int device_number, float *recv_direction_vector = {});
 
 
 int main()
@@ -387,71 +392,59 @@ bool check_end_signal()//check if VR thread is ended
 void run_mouse_emulation(int device_number, string com_port) {//controller device number and com ports
 	bool tracking_values_available;
 	float *matrix[3];
-
-	cout << "Position you controller directly onto the cursor, pointing directly at the tip of the cursor and press trigger";
+	POINT cursor_position;
+	cout << "Position controller "+ std::to_string(device_number) +" directly onto the cursor, pointing directly at the tip of the cursor and press trigger";
+	float *direction_vector_cursor_controller; //direction vector of controller
+	float *abs_position_controller_cursor = get_coordinate_trigger_press(device_number, direction_vector_cursor_controller);//x,y,z coordinates
 	GetCursorPos(&cursor_position);
+
+	//TODO: find direction vector between screen_normal_unit_vector and direction_vector_cursor_controller
 
 
 	VREvent_t event;
 
 	for (;;) {
+		//button tracking only works when controller plugged in
 
 		tracking_values_available = false;
-		tracking_device_mutex.lock();
+		tracking_device_mutex.lock();//thread safety for multiple controllers
+		TrackedDevicePose_t tracked_device_pose;
+		VRControllerState_t controllerState;
 
-		
-		//obtain rotation and translation matrix for device_number
-		vr_context->GetDeviceToAbsoluteTrackingPose(vr::ETrackingUniverseOrigin::TrackingUniverseStanding, 0, tracked_device_pose, vr::k_unMaxTrackedDeviceCount);
-
-		TrackedDevicePose_t trackedDevicePose;
-		VRControllerState_t controller_state;
-		vr_context->GetControllerStateWithPose(
-			TrackingUniverseStanding, device_number, &controller_state,
-			sizeof(controller_state), &trackedDevicePose);
-
-		int trigger_index = 0;
-
-		for (int x = 0; x < k_unControllerStateAxisCount; x++) {
-			int prop = vr_context->GetInt32TrackedDeviceProperty(device_number,
-				(ETrackedDeviceProperty)(Prop_Axis0Type_Int32 + x));
-			if (prop == k_eControllerAxis_Trigger)
-				trigger_index = x;
-		}
-
-		//cout << "Controller trigger value" << controller_state.rAxis[trigger_index].x << endl;
-		for (vr::TrackedDeviceIndex_t unDevice = 0; unDevice < vr::k_unMaxTrackedDeviceCount; unDevice++) {
-			vr::VRControllerState_t state;
-			if (vr_context->GetControllerState(unDevice, &state,sizeof(state))) {
-				cout <<state.rAxis[0].x <<endl;
-				cout << state.rAxis[1].x << endl;
-				cout << state.rAxis[2].x << endl;
-				cout << state.rAxis[3].x << endl;
-				cout << state.rAxis[4].x << endl;
-			}
-		}
-
-		if ((tracked_device_pose[device_number].bDeviceIsConnected) && (tracked_device_pose[device_number].bPoseIsValid))
-		{
-			matrix[0] = tracked_device_pose[device_number].mDeviceToAbsoluteTracking.m[0];
-			matrix[1] = tracked_device_pose[device_number].mDeviceToAbsoluteTracking.m[1];
-			matrix[2] = tracked_device_pose[device_number].mDeviceToAbsoluteTracking.m[2];
-			tracking_values_available = true;
-		}
+		vr_context->GetControllerStateWithPose(//get controller state and translation
+			TrackingUniverseStanding, device_number, &controllerState,
+			sizeof(controllerState), &tracked_device_pose);
 		tracking_device_mutex.unlock();
+		
+		if ((tracked_device_pose.bPoseIsValid && tracked_device_pose.bDeviceIsConnected))
+		{
+			matrix[0] = tracked_device_pose.mDeviceToAbsoluteTracking.m[0];
+			matrix[1] = tracked_device_pose.mDeviceToAbsoluteTracking.m[1];
+			matrix[2] = tracked_device_pose.mDeviceToAbsoluteTracking.m[2];
+			tracking_values_available = true;
+		}		
+		if (tracking_values_available) {//then process controller position
 
-
-		if (tracking_values_available) {//then send the vector to COM
 			float abs_position[3] = { matrix[0][3], matrix[1][3], matrix[2][3] };// absolute position vector of device;
 			//find direction vector from obtained rotation matrix
-			float sqrt_magnitude = sqrt(1/3.00);
+			float sqrt_magnitude = sqrt(1 / 3.00);
+			cout << "Device " << device_number << endl << " Controller coordinates(" << abs_position[0] << "," << abs_position[1] << "," << abs_position[2] << ")" << endl;
 			float direction_vector[3] = { (matrix[0][0] + matrix[1][0] + matrix[2][0]) * sqrt_magnitude, (matrix[0][1] + matrix[1][1] + matrix[2][1]) * sqrt_magnitude,(matrix[0][2] + matrix[1][2] + matrix[2][2]) * sqrt_magnitude };
 			float vector_magnitude = pow(direction_vector[0], 2) + pow(direction_vector[1], 2) + pow(direction_vector[2], 2);
-			//cout << "device number " << device_number << " magnitude" <<vector_magnitude << endl;
-			//TODO: find intersection with screen plane
-
+			
+			//TODO: get intersection point P_int of line formed by vector and direction on screen_plane
+			
+			
 			//TODO: send data to serial
+			
+			
 
 		}
+
+		
+
+
+		
 		Sleep(500);//expected polling rate of 200Hz
 		if (check_end_signal()) {//if end signal received, end thread
 			cout << "thread for device "<< device_number << " ended" << endl;
@@ -463,11 +456,46 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 }
 
 
-float *get_coordinate_trigger_press(int device_number) {
-	float coordinates[2];
+float *get_coordinate_trigger_press(int device_number, float *recv_direction_vector = {}) { //get controller coordinates on trigger press 
+	float *matrix[3];
+
+	for (;;) {
+		bool tracking_values_available = false;
+		tracking_device_mutex.lock();//thread safety for multiple controllers
+		TrackedDevicePose_t tracked_device_pose;
+		VRControllerState_t controllerState;
+
+		vr_context->GetControllerStateWithPose(//get controller state and translation
+			TrackingUniverseStanding, device_number, &controllerState,
+			sizeof(controllerState), &tracked_device_pose);
+		tracking_device_mutex.unlock();
+
+		if ((tracked_device_pose.bPoseIsValid && tracked_device_pose.bDeviceIsConnected))
+		{
+			matrix[0] = tracked_device_pose.mDeviceToAbsoluteTracking.m[0];
+			matrix[1] = tracked_device_pose.mDeviceToAbsoluteTracking.m[1];
+			matrix[2] = tracked_device_pose.mDeviceToAbsoluteTracking.m[2];
+			tracking_values_available = true;
+		}
+		if (tracking_values_available) {//then process controller position
+
+			for (int j = 0; j < vr::k_unControllerStateAxisCount; j++)//check for trigger press
+			{
+				vr::ETrackedDeviceProperty prop = (vr::ETrackedDeviceProperty)(vr::Prop_Axis0Type_Int32 + j);
+				vr::EVRControllerAxisType type = (vr::EVRControllerAxisType)vr::VRSystem()->GetInt32TrackedDeviceProperty(device_number, prop);
+				if (type == vr::k_eControllerAxis_Trigger)
+				{
+					if (controllerState.rAxis[j].x > 0.5) {
+						float ret_value[3] = { matrix[0][3], matrix[1][3], matrix[2][3] };
+						float sqrt_magnitude = sqrt(1 / 3.00);
+						float direction_vector[3] = { (matrix[0][0] + matrix[1][0] + matrix[2][0]) * sqrt_magnitude, (matrix[0][1] + matrix[1][1] + matrix[2][1]) * sqrt_magnitude,(matrix[0][2] + matrix[1][2] + matrix[2][2]) * sqrt_magnitude };
+						recv_direction_vector = direction_vector;
+						return ret_value;
+					}
+				}
+
+			}
+		}
 
 
-
-
-	return coordinates;
 }
