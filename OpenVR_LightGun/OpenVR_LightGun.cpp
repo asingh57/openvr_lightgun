@@ -30,9 +30,12 @@ set<int> available_controllers;
 std::mutex end_signal_mutex;
 bool end_signal=false;
 std::mutex tracking_device_mutex;
-float *screen_plane[2][2];
-float screen_normal_unit_vector[2];
+float ***screen_plane_input;
 
+float screen_plane_adjusted[4]; //form ax,by,cz,d
+float *screen_plane_corners[4];//four corners of the screen plane correspond to the screen
+
+float screen_normal_unit_vector[3];
 
 
 void send_end_signal();
@@ -80,6 +83,12 @@ int main()
 	bool screen_coordinates_configured = false;
 	
 
+	screen_plane_input = new float**[2];
+	screen_plane_input[0] = new float*[2];
+	screen_plane_input[1] = new float*[2];
+
+	int device_number_arr[64];
+	int com_port_arr[64];
 	if (vr_context != NULL)
 	{
 
@@ -96,13 +105,17 @@ int main()
 				for (;;) {
 
 					std::cout << "Please bring the controller to the top left edge of the screen and press the trigger" << endl;
-					screen_plane[0][0] = get_coordinate_trigger_press(device_number);
+					screen_plane_input[0][0] = get_coordinate_trigger_press(device_number);
+					
 					std::cout << "Please bring the controller to the top right edge of the screen and press the trigger" << endl;
-					screen_plane[0][1] = get_coordinate_trigger_press(device_number);
+					screen_plane_input[0][1] = get_coordinate_trigger_press(device_number);
+					
 					std::cout << "Please bring the controller to the bottom left edge of the screen and press the trigger" << endl;
-					screen_plane[1][0] = get_coordinate_trigger_press(device_number);
+					screen_plane_input[1][0] = get_coordinate_trigger_press(device_number);
+
 					std::cout << "Please bring the controller to the bottom right edge of the screen and press the trigger" << endl;
-					screen_plane[1][1] = get_coordinate_trigger_press(device_number);
+					screen_plane_input[1][1] = get_coordinate_trigger_press(device_number);
+
 					std::cout << "Press x to recalibrate, otherwise press any key to continue" << endl;
 					char response;
 					cin >> response;
@@ -112,17 +125,68 @@ int main()
 
 				}
 				screen_coordinates_configured = true;
+				
+
+				float v1[3];
+				v1[0] = screen_plane_input[0][0][0]- screen_plane_input[0][1][0];
+				v1[1] = screen_plane_input[0][0][1] - screen_plane_input[0][1][1];
+				v1[2] = screen_plane_input[0][0][2] - screen_plane_input[0][1][2];
+				float v2[3];
+				v2[0] = screen_plane_input[0][0][0] - screen_plane_input[1][0][0];
+				v2[1] = screen_plane_input[0][0][1] - screen_plane_input[1][0][1];
+				v2[2] = screen_plane_input[0][0][2] - screen_plane_input[1][0][2];
+				/*
+				cout << "AAA" << screen_plane_input[0][0][0] << "," << screen_plane_input[0][0][1] << "," << screen_plane_input[0][0][1] << endl;
+				cout << "AAA" << screen_plane_input[0][1][0] << "," << screen_plane_input[0][1][1] << "," << screen_plane_input[0][1][2] << endl;
+				cout << "AAA" << screen_plane_input[1][0][0] << "," << screen_plane_input[1][0][1] << "," << screen_plane_input[1][0][1] << endl;
+				cout << "AAA" << screen_plane_input[1][1][0] << "," << screen_plane_input[1][1][1] << "," << screen_plane_input[1][1][2] << endl;
+				*/
+				
+				screen_normal_unit_vector[0] = (v1[1] * v2[2]) - (v1[2] * v2[1]);
+				screen_normal_unit_vector[1] = -((v1[0] * v2[2]) - (v1[2] * v2[0]));
+				screen_normal_unit_vector[2] = (v1[0] * v2[1]) - (v1[1] * v2[0]);
+
+				float magnitude = pow((pow(screen_normal_unit_vector[0], 2) + pow(screen_normal_unit_vector[1], 2) + pow(screen_normal_unit_vector[2], 2)), 0.5);
+				
+				screen_normal_unit_vector[0]= screen_normal_unit_vector[0]/ magnitude;
+				screen_normal_unit_vector[1]= screen_normal_unit_vector[1] / magnitude;
+				screen_normal_unit_vector[2]= screen_normal_unit_vector[2] / magnitude;
+
+
+				screen_plane_adjusted[0] = screen_normal_unit_vector[0];
+				screen_plane_adjusted[1] = screen_normal_unit_vector[1];
+				screen_plane_adjusted[2] = screen_normal_unit_vector[2];
+				
+				screen_plane_adjusted[3] = -(screen_normal_unit_vector[0] * screen_plane_input[0][0][0] + screen_normal_unit_vector[1] * screen_plane_input[0][0][1] + screen_normal_unit_vector[2] * screen_plane_input[0][0][2]);
+
+				cout << screen_plane_adjusted[0] << "," << screen_plane_adjusted[1] << "," << screen_plane_adjusted[2] << "," << screen_plane_adjusted[3] << endl;
+
+
+				screen_plane_corners[0] = screen_plane_input[0][0];
+				screen_plane_corners[1] = screen_plane_input[0][1];
+				screen_plane_corners[2] = screen_plane_input[1][0];
+
+				float a = screen_plane_adjusted[0], b = screen_plane_adjusted[1], c = screen_plane_adjusted[2], d = screen_plane_adjusted[3];
+				float p = screen_plane_input[0][0][0], q = screen_plane_input[0][0][1], r = screen_plane_input[0][0][2];
+				float t = (-d - a * p - b * q - c * r) / (a*a + b * b + c * c);
+				screen_plane_corners[3] = new float[3];
+				screen_plane_corners[3][0]= p + a * t;
+				screen_plane_corners[3][1] = q + b * t;
+				screen_plane_corners[3][2] = r + c * t;
+					
+
+				//cout << "screen_plane_corners" << screen_plane_corners[3][0] << screen_plane_corners[3][1] << screen_plane_corners[3][2] << endl;
+
 			}
 
-			std::cout << "Select enter a com port number for this light_gun(you can find this in windows device manager)" << endl;
+			std::cout << "Enter a valid com port number for this light_gun(you can find this in windows device manager)" << endl;
 			int com_port;
 			cin >> com_port;
 
-			//check if valid port here
-			emulator_threads[emulator_count] = std::thread(run_mouse_emulation, device_number, "COM" + com_port);
-			emulator_threads[emulator_count].detach();
-			emulator_count += 1;
-
+			//TODO: check if valid port here
+			
+			device_number_arr[emulator_count] = device_number;
+			com_port_arr[emulator_count] = com_port;
 
 			bool cont_statement = true;
 			char response;
@@ -137,13 +201,24 @@ int main()
 					std::cout << "Invalid input" << endl;
 				}
 			}
+			
+			emulator_count += 1;
 			if (response == 'n') {
 				break;
 			}
 		}
+
+
+		std::cout << "mouse emulation running, to end emulation, enter \"end\" " << endl;
+
+
+		for (int x = 0; x < emulator_count; x++) {
+			emulator_threads[emulator_count] = std::thread(run_mouse_emulation, device_number_arr[x], "COM" + com_port_arr[x]);
+			emulator_threads[emulator_count].detach();
+		}
+
 		
 		for (;;) {
-			std::cout << "mouse emulation running, to end emulation, enter \"end\" " << endl;
 			string end_command;
 			cin >> end_command;
 			if (end_command=="end") {
@@ -153,7 +228,7 @@ int main()
 				//break;
 			}
 			else {
-				std::cout << "invalid command" << endl;
+				std::cout << "invalid command. Enter \"end\" to end emulation" << endl;
 			}
 
 
@@ -406,6 +481,12 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 	std::cout << "Position controller "+ std::to_string(device_number) +" directly onto the cursor, pointing directly at the tip of the cursor and press trigger";
 	float *direction_vector_cursor_controller = new float[3]; //direction vector of controller
 	float *abs_position_controller_cursor = get_coordinate_trigger_press(device_number, direction_vector_cursor_controller);//x,y,z coordinates
+	
+	//find rotation matrix between direction vector and screen normal vector
+	float **rotation_matrix = get_rotation_matrix(direction_vector_cursor_controller, screen_normal_unit_vector);
+
+
+
 	GetCursorPos(&cursor_position);
 
 	//TODO: find direction vector between screen_normal_unit_vector and direction_vector_cursor_controller
@@ -442,7 +523,7 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 			float direction_vector[3] = { (matrix[0][0] + matrix[1][0] + matrix[2][0]) * sqrt_magnitude, (matrix[0][1] + matrix[1][1] + matrix[2][1]) * sqrt_magnitude,(matrix[0][2] + matrix[1][2] + matrix[2][2]) * sqrt_magnitude };
 			float vector_magnitude = pow(direction_vector[0], 2) + pow(direction_vector[1], 2) + pow(direction_vector[2], 2);
 			
-			//TODO: get intersection point P_int of line formed by vector and direction on screen_plane
+			//TODO: get intersection point P_int of line formed by vector and direction on screen_plane_adjusted
 			
 			
 			//TODO: send data to serial
@@ -468,12 +549,14 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 
 float *get_coordinate_trigger_press(int device_number, float *recv_direction_vector) { //get controller coordinates on trigger press 
 	float *matrix[3];
-
+	float *ret_value = new float[3];
+	bool ret_defined = false;
 	for (;;) {
 		bool tracking_values_available = false;
 		tracking_device_mutex.lock();//thread safety for multiple controllers
 		TrackedDevicePose_t tracked_device_pose;
 		VRControllerState_t controllerState;
+		
 
 		vr_context->GetControllerStateWithPose(//get controller state and translation
 			TrackingUniverseStanding, device_number, &controllerState,
@@ -495,14 +578,29 @@ float *get_coordinate_trigger_press(int device_number, float *recv_direction_vec
 				vr::EVRControllerAxisType type = (vr::EVRControllerAxisType)vr::VRSystem()->GetInt32TrackedDeviceProperty(device_number, prop);
 				if (type == vr::k_eControllerAxis_Trigger)
 				{
-					if (controllerState.rAxis[j].x > 0.5) {
-						float ret_value[3] = { matrix[0][3], matrix[1][3], matrix[2][3] };
+					if (j==1 && controllerState.rAxis[j].x > 0.5) {
+						ret_value[0] = matrix[0][3];
+						ret_value[1] = matrix[1][3];
+						ret_value[2] = matrix[2][3];
 						float sqrt_magnitude = sqrt(1 / 3.00);
 						float direction_vector[3] = { (matrix[0][0] + matrix[1][0] + matrix[2][0]) * sqrt_magnitude, (matrix[0][1] + matrix[1][1] + matrix[2][1]) * sqrt_magnitude,(matrix[0][2] + matrix[1][2] + matrix[2][2]) * sqrt_magnitude };
+						
+
+						if (!ret_defined) {
+							cout << "Now please release the trigger" << j << endl;
+						}
+						ret_defined = true;
+						
 						recv_direction_vector = direction_vector;
+						vr_context->TriggerHapticPulse(device_number, 0, 300);
+						
+					}
+					else if(j == 1 &&  ret_defined && controllerState.rAxis[j].x<0.5){
+
 						return ret_value;
 					}
 				}
+				
 
 			}
 		}
@@ -568,8 +666,8 @@ float **get_rotation_matrix(float f[3], float t[3]) {// rotation of a into b
 	float mag_f = pow((pow(f[0], 2) + pow(f[1], 2) + pow(f[2], 2)), 0.5);
 	float mag_t = pow((pow(t[0], 2) + pow(t[1], 2) + pow(t[2], 2)), 0.5);
 
-	std::cout << "mag_f=" << mag_f << endl;
-	std::cout << "mag_t=" << mag_t << endl;
+	//std::cout << "mag_f=" << mag_f << endl;
+	//std::cout << "mag_t=" << mag_t << endl;
 
 	f[0] = f[0] / mag_f;
 	f[1] = f[1] / mag_f;
@@ -579,8 +677,8 @@ float **get_rotation_matrix(float f[3], float t[3]) {// rotation of a into b
 	t[2] = t[2] / mag_t;
 
 
-	std::cout << "new vector f=" << f[0] << "," << f[1] << "," << f[2] << endl;
-	std::cout << "new vector t=" << t[0] << "," << t[1] << "," << t[2] << endl;
+	//std::cout << "new vector f=" << f[0] << "," << f[1] << "," << f[2] << endl;
+	//std::cout << "new vector t=" << t[0] << "," << t[1] << "," << t[2] << endl;
 
 	float v[3];
 	float s;
@@ -590,16 +688,16 @@ float **get_rotation_matrix(float f[3], float t[3]) {// rotation of a into b
 	v[1] = -((f[0] * t[2]) - (f[2] * t[0]));
 	v[2] = (f[0] * t[1]) - (f[1] * t[0]);
 
-	std::cout << "v=aXb=" << v[0] << "," << v[1] << "," << v[2] << endl;
+	//std::cout << "v=aXb=" << v[0] << "," << v[1] << "," << v[2] << endl;
 
 
 	s = pow((pow(v[0], 2) + pow(v[1], 2) + pow(v[2], 2)), 0.5);
-	std::cout << "sin value=" << s << endl;
+	//std::cout << "sin value=" << s << endl;
 
 
 
 	float c = dot_product(f, t);
-	std::cout << "cos value=" << c << endl;
+	//std::cout << "cos value=" << c << endl;
 
 
 	float** u_hat;
@@ -622,7 +720,7 @@ float **get_rotation_matrix(float f[3], float t[3]) {// rotation of a into b
 			}
 		}
 	}
-	std::cout << "Identity Matrix" << endl;
+	//std::cout << "Identity Matrix" << endl;
 	for (int i = 0; i < 3; i++) {
 		for (int j = 0; j < 3; j++) {
 			std::cout << identity[i][j] << " ";
@@ -643,14 +741,14 @@ float **get_rotation_matrix(float f[3], float t[3]) {// rotation of a into b
 
 
 	multiplyMatrices(u_hat, u_hat, u_hat_sq);
-	std::cout << "u_hat Matrix" << endl;
+	//std::cout << "u_hat Matrix" << endl;
 	for (int i = 0; i < 3; i++) {
 		for (int j = 0; j < 3; j++) {
 			std::cout << u_hat[i][j] << " ";
 		}
 		std::cout << endl;
 	}
-	std::cout << "u_hat square" << endl;
+	//std::cout << "u_hat square" << endl;
 	for (int i = 0; i < 3; i++) {
 		for (int j = 0; j < 3; j++) {
 			std::cout << u_hat_sq[i][j] << " ";
