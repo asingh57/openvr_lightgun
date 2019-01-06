@@ -18,7 +18,114 @@
 #include "wtypes.h"
 
 
+#define ARDUINO_WAIT_TIME 2000
 
+
+
+class SerialPort
+{
+private:
+	HANDLE handler;
+	bool connected;
+	COMSTAT status;
+	DWORD errors;
+public:
+	SerialPort(char *portName);
+	~SerialPort();
+
+	int readSerialPort(char *buffer, unsigned int buf_size);
+	bool writeSerialPort(char *buffer, unsigned int buf_size);
+	bool isConnected();
+};
+
+SerialPort::SerialPort(char *portName)
+{
+	this->connected = false;
+
+	this->handler = CreateFileA(static_cast<LPCSTR>(portName),
+		GENERIC_READ | GENERIC_WRITE,
+		0,
+		NULL,
+		OPEN_EXISTING,
+		FILE_ATTRIBUTE_NORMAL,
+		NULL);
+	if (this->handler == INVALID_HANDLE_VALUE) {
+		if (GetLastError() == ERROR_FILE_NOT_FOUND) {
+			printf("ERROR: Handle was not attached. Reason: %s not available\n", portName);
+		}
+		else
+		{
+			printf("ERROR!!!");
+		}
+	}
+	else {
+		DCB dcbSerialParameters = { 0 };
+
+		if (!GetCommState(this->handler, &dcbSerialParameters)) {
+			printf("failed to get current serial parameters");
+		}
+		else {
+			dcbSerialParameters.BaudRate = CBR_9600;
+			dcbSerialParameters.ByteSize = 8;
+			dcbSerialParameters.StopBits = ONESTOPBIT;
+			dcbSerialParameters.Parity = NOPARITY;
+			dcbSerialParameters.fDtrControl = DTR_CONTROL_ENABLE;
+
+			if (!SetCommState(handler, &dcbSerialParameters))
+			{
+				printf("ALERT: could not set Serial port parameters\n");
+			}
+			else {
+				this->connected = true;
+				PurgeComm(this->handler, PURGE_RXCLEAR | PURGE_TXCLEAR);
+				Sleep(ARDUINO_WAIT_TIME);
+			}
+		}
+	}
+}
+
+SerialPort::~SerialPort()
+{
+	if (this->connected) {
+		this->connected = false;
+		CloseHandle(this->handler);
+	}
+}
+
+int SerialPort::readSerialPort(char *buffer, unsigned int buf_size)
+{
+	DWORD bytesRead;
+	unsigned int toRead;
+
+	ClearCommError(this->handler, &this->errors, &this->status);
+
+	if (this->status.cbInQue > 0) {
+		if (this->status.cbInQue > buf_size) {
+			toRead = buf_size;
+		}
+		else toRead = this->status.cbInQue;
+	}
+
+	if (ReadFile(this->handler, buffer, toRead, &bytesRead, NULL)) return bytesRead;
+
+	return 0;
+}
+
+bool SerialPort::writeSerialPort(char *buffer, unsigned int buf_size)
+{
+	DWORD bytesSend;
+
+	if (!WriteFile(this->handler, (void*)buffer, buf_size, &bytesSend, 0)) {
+		ClearCommError(this->handler, &this->errors, &this->status);
+		return false;
+	}
+	else return true;
+}
+
+bool SerialPort::isConnected()
+{
+	return this->connected;
+}
 
 
 
@@ -78,6 +185,9 @@ void sum_matrix(float **x, float **y);//x will be updated
 float **get_rotation_matrix(float f[3], float t[3]);// rotation of a into b
 
 
+SerialPort *arduino[64];
+
+
 
 
 vr::IVRSystem* vr_context;
@@ -127,8 +237,8 @@ void Quad_to_Logical_Cell(float x,float y,int *L_Out){
     float b1y = Qx[1] * Qy[1] - Qx[0] * Qy[0] + (Qx[3] * Qy[3] - Qx[0] * Qy[0]) * (Qx[1] - Qx[0]) / (Qx[0] - Qx[3]);
     float b2y = Qx[2] * Qy[2] - Qx[0] * Qy[0] + (Qx[3] * Qy[3] - Qx[0] * Qy[0]) * (Qx[2] - Qx[0]) / (Qx[0] - Qx[3]);
 
-    L_Out[1] = vert_resolution * ((ax / a3x) + (1 - a2x / a3x) * (bx - b3x * ax / a3x) / (b2x - b3x * a2x / a3x));
-    L_Out[0] = hor_resolution * ((ay / a1y) + (1 - a2y / a1y) * (by - b1y * ay / a1y) / (b2y - b1y * a2y / a1y));
+    L_Out[1] = vert_resolution * (1-((ax / a3x) + (1 - a2x / a3x) * (bx - b3x * ax / a3x) / (b2x - b3x * a2x / a3x)));
+    L_Out[0] = hor_resolution * (((ay / a1y) + (1 - a2y / a1y) * (by - b1y * ay / a1y) / (b2y - b1y * a2y / a1y)));
 
 }
 
@@ -345,7 +455,7 @@ int main()
 	screen_plane_input[1] = new float*[2];
 
 	int device_number_arr[64];
-	int com_port_arr[64];
+	string com_port_arr[64];
 	if (vr_context != NULL)
 	{
 
@@ -432,11 +542,16 @@ int main()
 			}
 
 			std::cout << "Enter a valid com port number for this light_gun(you can find this in windows device manager)" << endl;
-			int com_port;
+			string com_port;
 			cin >> com_port;
 
+			const string port_str = "\\\\.\\COM" + com_port;
+			char char_array[32];
+
+			strcpy_s(char_array, port_str.c_str());
+			arduino[device_number] = new SerialPort(char_array);
+
 			//TODO: check if valid port here
-			
 			device_number_arr[emulator_count] = device_number;
 			com_port_arr[emulator_count] = com_port;
 
@@ -731,15 +846,20 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 
 			float abs_position[3] = { matrix[0][3], matrix[1][3], matrix[2][3] };// absolute position vector of device;
 			//find direction vector from obtained rotation matrix
-			float direction_vector[3] = { (matrix[0][0] + matrix[1][0] + matrix[2][0]) * sqrt_magnitude, (matrix[0][1] + matrix[1][1] + matrix[2][1]) * sqrt_magnitude,(matrix[0][2] + matrix[1][2] + matrix[2][2]) * sqrt_magnitude };
+			float direction_vector[3] = { (matrix[0][0] + matrix[0][1] + matrix[0][2]) * sqrt_magnitude, (matrix[1][0] + matrix[1][1] + matrix[1][2]) * sqrt_magnitude,(matrix[2][0] + matrix[2][1] + matrix[2][2]) * sqrt_magnitude };
 			//float vector_magnitude = pow(direction_vector[0], 2) + pow(direction_vector[1], 2) + pow(direction_vector[2], 2);
 			
+			cout << "abs_posn"<< abs_position[0] << "," << abs_position[1] << "," << abs_position[2] << endl;
+			cout << "dir_vector" << direction_vector[0] << "," << direction_vector[1] << "," << direction_vector[2] << endl;
+
 			
-			adjusted_direction_vector[0] = rotation_matrix[0][0]*direction_vector[0]+ rotation_matrix[0][1] * direction_vector[1]+ rotation_matrix[0][2] * direction_vector[2];
-			adjusted_direction_vector[1] = rotation_matrix[1][0] * direction_vector[0] + rotation_matrix[1][1] * direction_vector[1] + rotation_matrix[1][2] * direction_vector[2];
-			adjusted_direction_vector[2] = rotation_matrix[2][0] * direction_vector[0] + rotation_matrix[2][1] * direction_vector[1] + rotation_matrix[2][2] * direction_vector[2];
+			//adjusted_direction_vector[0] = rotation_matrix[0][0]*direction_vector[0]+ rotation_matrix[0][1] * direction_vector[1]+ rotation_matrix[0][2] * direction_vector[2];
+			//adjusted_direction_vector[1] = rotation_matrix[1][0] * direction_vector[0] + rotation_matrix[1][1] * direction_vector[1] + rotation_matrix[1][2] * direction_vector[2];
+			//adjusted_direction_vector[2] = rotation_matrix[2][0] * direction_vector[0] + rotation_matrix[2][1] * direction_vector[1] + rotation_matrix[2][2] * direction_vector[2];
 
-
+			adjusted_direction_vector[0] = direction_vector[0];
+			adjusted_direction_vector[1] = direction_vector[1];
+			adjusted_direction_vector[2] = direction_vector[2];
 
 
 			float p = abs_position[0], q = abs_position[1], r = abs_position[2];
@@ -748,6 +868,9 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 			pt_of_screen_projection[0] = p + l * t;
 			pt_of_screen_projection[1] = q + m * t;
 			pt_of_screen_projection[2] = r + n * t;
+			cout << "pt_of_screen_projection" << pt_of_screen_projection[0] << "," << pt_of_screen_projection[1] << "," << pt_of_screen_projection[2] << endl;
+
+
 			//map point onto the display resolution
 
 			//assuming top and bottom of the screen are parallel and left and right have equal lengths
@@ -775,7 +898,7 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 
 
 		
-		Sleep(500);//expected polling rate of 200Hz
+		Sleep(1000);//expected polling rate of 200Hz
 		if (check_end_signal()) {//if end signal received, end thread
 			std::cout << "thread for device "<< device_number << " ended" << endl;
 			return;
