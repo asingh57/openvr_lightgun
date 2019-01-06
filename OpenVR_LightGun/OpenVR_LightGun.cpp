@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <tchar.h>
 #include <math.h> 
+#include "wtypes.h"
 
 
 
@@ -27,6 +28,21 @@ using namespace vr;
 set<int> available_controllers;
 
 
+void GetDesktopResolution(int& horizontal, int& vertical)
+{
+	RECT desktop;
+	// Get a handle to the desktop window
+	const HWND hDesktop = GetDesktopWindow();
+	// Get the size of screen to the variable desktop
+	GetWindowRect(hDesktop, &desktop);
+	// The top left corner will have coordinates (0,0)
+	// and the bottom right corner will have coordinates
+	// (horizontal, vertical)
+	horizontal = desktop.right;
+	vertical = desktop.bottom;
+}
+
+
 std::mutex end_signal_mutex;
 bool end_signal=false;
 std::mutex tracking_device_mutex;
@@ -34,8 +50,14 @@ float ***screen_plane_input;
 
 float screen_plane_adjusted[4]; //form ax,by,cz,d
 float *screen_plane_corners[4];//four corners of the screen plane correspond to the screen
-
 float screen_normal_unit_vector[3];
+
+float screen_in_2d[4][3];
+float loc0[3], locx[3], locy[3], normal[3];
+
+
+int hor_resolution;
+int vert_resolution;
 
 
 void send_end_signal();
@@ -49,9 +71,9 @@ string GetTrackedDeviceClassString(vr::ETrackedDeviceClass td_class);
 
 
 
-float dot_product(float v1[3], float v2[3]);
+float dot_product2(float v1[3], float v2[3]);
 void multiplyMatrices(float *firstMatrix[3], float *secondMatrix[3], float *mult[3]);
-void vector_scalar_mult(float *x[3], float scalar);
+void matrix_scalar_mult(float *x[3], float scalar);
 void sum_matrix(float **x, float **y);//x will be updated
 float **get_rotation_matrix(float f[3], float t[3]);// rotation of a into b
 
@@ -65,9 +87,239 @@ string driver_name, driver_serial;
 string tracked_device_type[vr::k_unMaxTrackedDeviceCount];
 
 int init_OpenVR();
-void process_vr_event(const vr::VREvent_t & event);
 void exit();
 float *get_coordinate_trigger_press(int device_number, float *recv_direction_vector = {});
+
+
+
+void cross_product(float *a, float *b, float *ret_value) {
+	int x = 0;
+	int y = 1;
+	int z = 2;
+
+
+	ret_value[0] = a[y] * b[z] - a[z] * b[y];
+	ret_value[1] = a[z] * b[x] - a[x] * b[z];
+	ret_value[2] = a[x] * b[y] - a[y] * b[x];
+
+
+	return;
+}
+float dot_product(float *a, float *b) {
+	return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+float magnitude(float *vectorx) {
+	return pow((pow(vectorx[0], 2) + pow(vectorx[1], 2) + pow(vectorx[2], 2)), 0.5);
+}
+void subtract_vectors(float *a, float *b, float *ret_value) {
+
+	ret_value[0] = a[0] - b[0];
+	ret_value[1] = a[1] - b[1];
+	ret_value[2] = a[2] - b[2];
+}
+
+void add_vectors(float *a, float *b, float *ret_value) {
+
+	ret_value[0] = a[0] + b[0];
+	ret_value[1] = a[1] + b[1];
+	ret_value[2] = a[2] + b[2];
+
+
+
+	return;
+}
+
+void convert_to_2d(float *p, float *ret_value) {
+
+	float r1[3];
+	float r2[3];
+	subtract_vectors(p, loc0, r1);
+	subtract_vectors(p, loc0, r2);
+	ret_value[0] = dot_product(r1, locx);
+	ret_value[1] = dot_product(r2, locy);
+	ret_value[2] = 0;
+	return;
+}
+
+
+void unit_normal_vector(float *v1, float *v2, float *ret_val) {
+
+	float dir[3] = { v1[0] - v2[0],v1[1] - v2[1],0 };
+	float mag = magnitude(dir);
+
+	ret_val[0] = dir[0] / mag;
+	ret_val[1] = dir[1] / mag;
+	ret_val[2] = 0;
+	return;
+
+}
+
+void get_ptr_pos(float *pt_of_screen_projection, int* ret_val) {
+	//using https://math.stackexchange.com/questions/13404/mapping-irregular-quadrilateral-to-a-rectangle
+	int x = 0;
+	int y = 1;
+
+	cout << "screen_in_2d4 " << screen_in_2d[0][0] << "," << screen_in_2d[0][1] << endl;
+	cout << "screen_in_2d5 " << screen_in_2d[3][0] << "," << screen_in_2d[3][1] << endl;
+
+
+	float p[3], *p0, *p1, *p2, *p3, n0[3], n1[3], n2[3], n3[3];
+	float u, v;
+	p0 = screen_in_2d[0];
+	p1 = screen_in_2d[1];
+	p2 = screen_in_2d[3];
+	p3 = screen_in_2d[2];
+
+	cout << "p0 " << p0[0] << "," << p0[1] << endl;
+	cout << "p1 " << p1[0]<<"," <<p1[1] << endl;
+	cout << "p2 " << p2[0] << "," << p2[1] << endl;
+	cout << "p3 " << p3[0] << "," << p3[1] << endl;
+
+	unit_normal_vector(p0, p3, n0);
+	unit_normal_vector(p0, p1, n1);
+	unit_normal_vector(p1, p2, n2);
+	unit_normal_vector(p2, p3, n3);
+
+	cout << "n0" << n0[0] << "," << n0[1] << endl;
+	cout << "n1" << n1[0] << "," << n1[1] << endl;
+	cout << "n2" << n2[0] << "," << n2[1] << endl;
+	cout << "n3" << n3[0] << "," << n3[1] << endl;
+
+	float vs1[3];
+	float vs2[3];
+	float vs3[3];
+	float vs4[3];
+
+	//	following part is in the loop
+	convert_to_2d(pt_of_screen_projection, p);
+
+	cout << "p " << p[0] << "," << p[1] << endl;
+
+	subtract_vectors(p, p0, vs1);
+	subtract_vectors(p, p2, vs2);
+	subtract_vectors(p, p0, vs3);
+	subtract_vectors(p, p3, vs4);
+
+	u = dot_product(vs1, n0);
+	u = u / (u + dot_product(vs2, n2));
+	cout << "u " << u << endl;
+
+	v = dot_product(vs3, n1);
+	v = v / (v + dot_product(vs4, n3));
+	cout << "v " << v << endl;
+
+
+
+	float a = n0[x], b = n0[y], c = -dot_product(p0, n0);
+	float d = n0[x] + n2[x], e = n0[y] + n2[y], f = -dot_product(p0, n0) - dot_product(p2, n2);
+	float g = n1[x], h = n1[y], i = -dot_product(p0, n1);
+	float j = n1[x] + n3[x], k = n1[y] + n3[y], l = -dot_product(p0, n1) - dot_product(p2, n3);
+
+	cout << "u " << u << " f " << f << " c"<< c << endl;
+	cout << "v " << v << " l " << l << " i" << i << endl;
+
+	float uDA = u * (d - a);
+	float uEB = u * (e - b);
+	float uFC = u * (f - c);
+	float vJG = u * (j - g);
+	float vKH = u * (k - h);
+	float vLI = u * (l - i);
+
+	cout << "uDA " << uDA << endl;
+	cout << "uEB " << uEB << endl;
+	cout << "uFC " << uFC << endl;
+	cout << "vJG " << vJG << endl;
+	cout << "vKH " << vKH << endl;
+	cout << "vLI " << vLI << endl;
+
+	cout << (vKH*uFC - vLI * uEB) << endl;
+	cout << (vJG*uEB - vKH * uDA) << endl;
+	cout << (vLI*uDA - uFC * vJG) << endl;
+	cout << (vJG*uEB - vKH * uDA) << endl;
+	cout << (vKH*uFC - vLI * uEB) / (vJG*uEB - vKH * uDA) << endl;
+	cout << (vLI*uDA - uFC * vJG) / (vJG*uEB - vKH * uDA) << endl;
+
+
+	ret_val[0] = hor_resolution * (vKH*uFC - vLI * uEB) / (vJG*uEB - vKH * uDA);
+	ret_val[1] = vert_resolution * (vLI*uDA - uFC * vJG) / (vJG*uEB - vKH * uDA);
+
+}
+
+
+void initialise_2d() {
+	//use screen_plane_corners
+	float normal[3];
+
+	loc0[0] = screen_plane_corners[0][0];
+	loc0[1] = screen_plane_corners[0][1];
+	loc0[2] = screen_plane_corners[0][2];
+
+	locx[0] = screen_plane_corners[1][0];
+	locx[1] = screen_plane_corners[1][1];
+	locx[2] = screen_plane_corners[1][2];
+
+	float r1[3];
+	float r2[3];
+	float r3[3];
+	float r4[2];
+	float r6[2];
+	float r7[2];
+
+	subtract_vectors(screen_plane_corners[2], loc0, r1);
+	cross_product(locx, r1, normal);
+	cross_product(normal, locx, locy);
+
+
+	float mag_locx = magnitude(locx);
+	float mag_locy = magnitude(locy);
+
+	locx[0] = locx[0] / mag_locx;
+	locx[1] = locx[1] / mag_locx;
+	locx[2] = locx[2] / mag_locx;
+	locy[0] = locy[0] / mag_locy;
+	locy[1] = locy[1] / mag_locy;
+	locy[2] = locy[2] / mag_locy;
+
+
+
+	convert_to_2d(screen_plane_corners[0], screen_in_2d[0]);
+	convert_to_2d(screen_plane_corners[1], screen_in_2d[1]);
+	convert_to_2d(screen_plane_corners[2], screen_in_2d[2]);
+	convert_to_2d(screen_plane_corners[3], screen_in_2d[3]);
+
+	cout << "screen_plane_corners[0] " << screen_plane_corners[0][0] << screen_plane_corners[0][1] << screen_plane_corners[0][2] << endl;
+	cout << "screen_plane_corners[1] " << screen_plane_corners[1][0] << screen_plane_corners[1][1] << screen_plane_corners[1][2] << endl;
+	cout << "screen_plane_corners[2] " << screen_plane_corners[2][0] << screen_plane_corners[2][1] << screen_plane_corners[2][2] << endl;
+	cout << "screen_plane_corners[3] " << screen_plane_corners[3][0] << screen_plane_corners[3][1] << screen_plane_corners[3][2] << endl;
+
+	cout << "screen_in_2d[0][0] " << screen_in_2d[0][0] << "," << screen_in_2d[0][1] << endl;
+	cout << "screen_in_2d[1][0] " << screen_in_2d[1][0] << "," << screen_in_2d[1][1] << endl;
+	cout << "screen_in_2d[2][0] " << screen_in_2d[2][0] << "," << screen_in_2d[2][1] << endl;
+	cout << "screen_in_2d[3][0] " << screen_in_2d[3][0] << "," << screen_in_2d[3][1] << endl;
+
+}
+
+void scalar_mult_vector(float scalar, float *vectorx, float *ret_value) {
+	ret_value[0] = vectorx[0] * scalar;
+	ret_value[1] = vectorx[1] * scalar;
+	ret_value[2] = vectorx[2] * scalar;
+	return;
+}
+
+void back_to_3d(float *vectorx, float *ret_value) {
+	float r1[3];
+	float r2[3];
+	float r4[3];
+
+	scalar_mult_vector(vectorx[0], locx, r2);
+	scalar_mult_vector(vectorx[1], locy, r1);
+	add_vectors(loc0, r2, r4);
+	add_vectors(r4, r1, ret_value);
+
+	return;
+}
+
 
 
 int main()
@@ -156,10 +408,7 @@ int main()
 				screen_plane_adjusted[0] = screen_normal_unit_vector[0];
 				screen_plane_adjusted[1] = screen_normal_unit_vector[1];
 				screen_plane_adjusted[2] = screen_normal_unit_vector[2];
-				
 				screen_plane_adjusted[3] = -(screen_normal_unit_vector[0] * screen_plane_input[0][0][0] + screen_normal_unit_vector[1] * screen_plane_input[0][0][1] + screen_normal_unit_vector[2] * screen_plane_input[0][0][2]);
-
-				cout << screen_plane_adjusted[0] << "," << screen_plane_adjusted[1] << "," << screen_plane_adjusted[2] << "," << screen_plane_adjusted[3] << endl;
 
 
 				screen_plane_corners[0] = screen_plane_input[0][0];
@@ -167,15 +416,16 @@ int main()
 				screen_plane_corners[2] = screen_plane_input[1][0];
 
 				float a = screen_plane_adjusted[0], b = screen_plane_adjusted[1], c = screen_plane_adjusted[2], d = screen_plane_adjusted[3];
-				float p = screen_plane_input[0][0][0], q = screen_plane_input[0][0][1], r = screen_plane_input[0][0][2];
+				float p = screen_plane_input[1][1][0], q = screen_plane_input[1][1][1], r = screen_plane_input[1][1][2];
 				float t = (-d - a * p - b * q - c * r) / (a*a + b * b + c * c);
 				screen_plane_corners[3] = new float[3];
 				screen_plane_corners[3][0]= p + a * t;
 				screen_plane_corners[3][1] = q + b * t;
-				screen_plane_corners[3][2] = r + c * t;
-					
+				screen_plane_corners[3][2] = r + c * t; 
 
-				//cout << "screen_plane_corners" << screen_plane_corners[3][0] << screen_plane_corners[3][1] << screen_plane_corners[3][2] << endl;
+				initialise_2d();// maps the screen plane onto z=0 plane
+				
+
 
 			}
 
@@ -312,56 +562,6 @@ int init_OpenVR()
 }
 
 
-void process_vr_event(const vr::VREvent_t & event)
-{
-	string str_td_class = GetTrackedDeviceClassString(vr_context->GetTrackedDeviceClass(event.trackedDeviceIndex));
-
-	switch (event.eventType)
-	{
-	case vr::VREvent_TrackedDeviceActivated:
-	{
-		std::cout << "Device " << event.trackedDeviceIndex << " attached (" << str_td_class << ")" << endl;
-		tracked_device_type[event.trackedDeviceIndex] = str_td_class;
-	}
-	break;
-	case vr::VREvent_TrackedDeviceDeactivated:
-	{
-		std::cout << "Device " << event.trackedDeviceIndex << " detached (" << str_td_class << ")" << endl;
-		tracked_device_type[event.trackedDeviceIndex] = "";
-	}
-	break;
-	case vr::VREvent_TrackedDeviceUpdated:
-	{
-		std::cout << "Device " << event.trackedDeviceIndex << " updated (" << str_td_class << ")" << endl;
-	}
-	break;
-	case vr::VREvent_ButtonPress:
-	{
-		vr::VREvent_Controller_t controller_data = event.data.controller;
-		std::cout << "Pressed button " << vr_context->GetButtonIdNameFromEnum((vr::EVRButtonId) controller_data.button) << " of device " << event.trackedDeviceIndex << " (" << str_td_class << ")" << endl;
-	}
-	break;
-	case vr::VREvent_ButtonUnpress:
-	{
-		vr::VREvent_Controller_t controller_data = event.data.controller;
-		std::cout << "Unpressed button " << vr_context->GetButtonIdNameFromEnum((vr::EVRButtonId) controller_data.button) << " of device " << event.trackedDeviceIndex << " (" << str_td_class << ")" << endl;
-	}
-	break;
-	case vr::VREvent_ButtonTouch:
-	{
-		vr::VREvent_Controller_t controller_data = event.data.controller;
-		std::cout << "Touched button " << vr_context->GetButtonIdNameFromEnum((vr::EVRButtonId) controller_data.button) << " of device " << event.trackedDeviceIndex << " (" << str_td_class << ")" << endl;
-	}
-	break;
-	case vr::VREvent_ButtonUntouch:
-	{
-		vr::VREvent_Controller_t controller_data = event.data.controller;
-		std::cout << "Untouched button " << vr_context->GetButtonIdNameFromEnum((vr::EVRButtonId) controller_data.button) << " of device " << event.trackedDeviceIndex << " (" << str_td_class << ")" << endl;
-	}
-	break;
-	}
-}
-
 void exit()
 {
 	vr::VR_Shutdown();
@@ -485,11 +685,17 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 	//find rotation matrix between direction vector and screen normal vector
 	float **rotation_matrix = get_rotation_matrix(direction_vector_cursor_controller, screen_normal_unit_vector);
 
+	float adjusted_direction_vector[3];
+	float a = screen_plane_adjusted[0], b = screen_plane_adjusted[1], c = screen_plane_adjusted[2], d = screen_plane_adjusted[3];
+	float pt_of_screen_projection[3];
 
+	GetDesktopResolution(hor_resolution,vert_resolution);
 
 	GetCursorPos(&cursor_position);
 
 	//TODO: find direction vector between screen_normal_unit_vector and direction_vector_cursor_controller
+
+	int axis_arr[2];
 
 
 	VREvent_t event;
@@ -501,12 +707,15 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 		tracking_device_mutex.lock();//thread safety for multiple controllers
 		TrackedDevicePose_t tracked_device_pose;
 		VRControllerState_t controllerState;
+		float sqrt_magnitude = sqrt(1 / 3.00);
 
 		vr_context->GetControllerStateWithPose(//get controller state and translation
 			TrackingUniverseStanding, device_number, &controllerState,
 			sizeof(controllerState), &tracked_device_pose);
 		tracking_device_mutex.unlock();
-		
+
+
+		float a = screen_plane_adjusted[0], b = screen_plane_adjusted[1], c = screen_plane_adjusted[2], d = screen_plane_adjusted[3];
 		if ((tracked_device_pose.bPoseIsValid && tracked_device_pose.bDeviceIsConnected))
 		{
 			matrix[0] = tracked_device_pose.mDeviceToAbsoluteTracking.m[0];
@@ -518,15 +727,42 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 
 			float abs_position[3] = { matrix[0][3], matrix[1][3], matrix[2][3] };// absolute position vector of device;
 			//find direction vector from obtained rotation matrix
-			float sqrt_magnitude = sqrt(1 / 3.00);
 			std::cout << "Device " << device_number << endl << " Controller coordinates(" << abs_position[0] << "," << abs_position[1] << "," << abs_position[2] << ")" << endl;
 			float direction_vector[3] = { (matrix[0][0] + matrix[1][0] + matrix[2][0]) * sqrt_magnitude, (matrix[0][1] + matrix[1][1] + matrix[2][1]) * sqrt_magnitude,(matrix[0][2] + matrix[1][2] + matrix[2][2]) * sqrt_magnitude };
-			float vector_magnitude = pow(direction_vector[0], 2) + pow(direction_vector[1], 2) + pow(direction_vector[2], 2);
-			
-			//TODO: get intersection point P_int of line formed by vector and direction on screen_plane_adjusted
+			//float vector_magnitude = pow(direction_vector[0], 2) + pow(direction_vector[1], 2) + pow(direction_vector[2], 2);
 			
 			
+			adjusted_direction_vector[0] = rotation_matrix[0][0]*direction_vector[0]+ rotation_matrix[0][1] * direction_vector[1]+ rotation_matrix[0][2] * direction_vector[2];
+			adjusted_direction_vector[1] = rotation_matrix[1][0] * direction_vector[0] + rotation_matrix[1][1] * direction_vector[1] + rotation_matrix[1][2] * direction_vector[2];
+			adjusted_direction_vector[2] = rotation_matrix[2][0] * direction_vector[0] + rotation_matrix[2][1] * direction_vector[1] + rotation_matrix[2][2] * direction_vector[2];
+
+
+
+
+			float p = abs_position[0], q = abs_position[1], r = abs_position[2];
+			float l = adjusted_direction_vector[0], m = adjusted_direction_vector[1], n = adjusted_direction_vector[2];
+			float t = (-d - a * p - b * q - c * r) / (a*l + b * m + c * n);
+			pt_of_screen_projection[0] = p + l * t;
+			pt_of_screen_projection[1] = q + m * t;
+			pt_of_screen_projection[2] = r + n * t;
+			//map point onto the display resolution
+
+			//assuming top and bottom of the screen are parallel and left and right have equal lengths
+			//get ratio of distance of pt from top and bottom
+			//map that onto y coordinate
+
+
+			cout << "screen_in_2d2 " << screen_in_2d[0][0] << "," << screen_in_2d[0][1] << endl;
+			cout << "screen_in_2d3 " << screen_in_2d[3][0] << "," << screen_in_2d[3][1] << endl;
+
+			get_ptr_pos(pt_of_screen_projection, axis_arr);
+
+			cout << "Axis arr" << axis_arr[0] <<"," << axis_arr[1] <<endl;
+
+
 			//TODO: send data to serial
+
+			//now map this onto
 			
 			
 
@@ -612,7 +848,7 @@ float *get_coordinate_trigger_press(int device_number, float *recv_direction_vec
 
 
 
-float dot_product(float v1[3], float v2[3]) {
+float dot_product2(float v1[3], float v2[3]) {
 	return v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
 }
 
@@ -644,7 +880,7 @@ void multiplyMatrices(float **firstMatrix, float **secondMatrix, float **mult)
 
 
 
-void vector_scalar_mult(float **x, float scalar) {
+void matrix_scalar_mult(float **x, float scalar) {
 	for (int i = 0; i < 3; ++i)
 		for (int j = 0; j < 3; ++j)
 		{
@@ -696,7 +932,7 @@ float **get_rotation_matrix(float f[3], float t[3]) {// rotation of a into b
 
 
 
-	float c = dot_product(f, t);
+	float c = dot_product2(f, t);
 	//std::cout << "cos value=" << c << endl;
 
 
@@ -758,7 +994,7 @@ float **get_rotation_matrix(float f[3], float t[3]) {// rotation of a into b
 
 
 
-	vector_scalar_mult(u_hat_sq, (1 / (1 + c)));
+	matrix_scalar_mult(u_hat_sq, (1 / (1 + c)));
 
 
 
