@@ -92,6 +92,47 @@ float *get_coordinate_trigger_press(int device_number, float *recv_direction_vec
 
 
 
+void Quad_to_Logical_Cell(float x,float y,int *L_Out){
+    
+  
+/*
+  'WJW 7-13-15
+  'This function performs a coordinate transform from X,Y space to the normalized L,M.
+  '
+  'If a point {is within {0,1} on both axes, it is within the transformed unit square.
+  'Qx,Qy vectors contain the 4 coordinates of the corners - x and y values, respectively, ordered as indicated below:
+  '
+  'The unit cell L(l,m) corresponding to Q(x,y) is oriented as:
+  'L0(x=0,y=0),L1(0,1), L2(1,1), L3(1,0).  The order matters.
+  'The following represent an algebraic solution to the system:
+  'l=a1 + b1x + c1y + d1xy
+  'm=a2 + b2x + c2y + d2xy
+*/
+
+
+    float Qx[4]={screen_in_2d[0][0],screen_in_2d[1][0],screen_in_2d[2][0],screen_in_2d[3][0]};
+    float Qy[4]={screen_in_2d[0][1],screen_in_2d[1][1],screen_in_2d[2][1],screen_in_2d[3][1]};
+
+
+    float ax = (x - Qx[0]) + (Qx[1] - Qx[0]) * (y - Qy[0]) / (Qy[0] - Qy[1]);
+    float a3x = (Qx[3] - Qx[0]) + (Qx[1] - Qx[0]) * (Qy[3] - Qy[0]) / (Qy[0] - Qy[1]);
+    float a2x = (Qx[2] - Qx[0]) + (Qx[1] - Qx[0]) * (Qy[2] - Qy[0]) / (Qy[0] - Qy[1]);
+    float ay = (y - Qy[0]) + (Qy[3] - Qy[0]) * (x - Qx[0]) / (Qx[0] - Qx[3]);
+    float a1y = (Qy[1] - Qy[0]) + (Qy[3] - Qy[0]) * (Qx[1] - Qx[0]) / (Qx[0] - Qx[3]);
+    float a2y = (Qy[2] - Qy[0]) + (Qy[3] - Qy[0]) * (Qx[2] - Qx[0]) / (Qx[0] - Qx[3]);
+    float bx = x * y - Qx[0] * Qy[0] + (Qx[1] * Qy[1] - Qx[0] * Qy[0]) * (y - Qy[0]) / (Qy[0] - Qy[1]);
+    float b3x = Qx[3] * Qy[3] - Qx[0] * Qy[0] + (Qx[1] * Qy[1] - Qx[0] * Qy[0]) * (Qy[3] - Qy[0]) / (Qy[0] - Qy[1]);
+    float b2x = Qx[2] * Qy[2] - Qx[0] * Qy[0] + (Qx[1] * Qy[1] - Qx[0] * Qy[0]) * (Qy[2] - Qy[0]) / (Qy[0] - Qy[1]);
+    float by = x * y - Qx[0] * Qy[0] + (Qx[3] * Qy[3] - Qx[0] * Qy[0]) * (x - Qx[0]) / (Qx[0] - Qx[3]);
+    float b1y = Qx[1] * Qy[1] - Qx[0] * Qy[0] + (Qx[3] * Qy[3] - Qx[0] * Qy[0]) * (Qx[1] - Qx[0]) / (Qx[0] - Qx[3]);
+    float b2y = Qx[2] * Qy[2] - Qx[0] * Qy[0] + (Qx[3] * Qy[3] - Qx[0] * Qy[0]) * (Qx[2] - Qx[0]) / (Qx[0] - Qx[3]);
+
+    L_Out[1] = vert_resolution * ((ax / a3x) + (1 - a2x / a3x) * (bx - b3x * ax / a3x) / (b2x - b3x * a2x / a3x));
+    L_Out[0] = hor_resolution * ((ay / a1y) + (1 - a2y / a1y) * (by - b1y * ay / a1y) / (b2y - b1y * a2y / a1y));
+
+}
+
+
 void cross_product(float *a, float *b, float *ret_value) {
 	int x = 0;
 	int y = 1;
@@ -160,10 +201,6 @@ void get_ptr_pos(float *pt_of_screen_projection, int* ret_val) {
 	int x = 0;
 	int y = 1;
 
-	cout << "screen_in_2d4 " << screen_in_2d[0][0] << "," << screen_in_2d[0][1] << endl;
-	cout << "screen_in_2d5 " << screen_in_2d[3][0] << "," << screen_in_2d[3][1] << endl;
-
-
 	float p[3], *p0, *p1, *p2, *p3, n0[3], n1[3], n2[3], n3[3];
 	float u, v;
 	p0 = screen_in_2d[0];
@@ -171,21 +208,13 @@ void get_ptr_pos(float *pt_of_screen_projection, int* ret_val) {
 	p2 = screen_in_2d[3];
 	p3 = screen_in_2d[2];
 
-	cout << "p0 " << p0[0] << "," << p0[1] << endl;
-	cout << "p1 " << p1[0]<<"," <<p1[1] << endl;
-	cout << "p2 " << p2[0] << "," << p2[1] << endl;
-	cout << "p3 " << p3[0] << "," << p3[1] << endl;
-
+	
 	unit_normal_vector(p0, p3, n0);
 	unit_normal_vector(p0, p1, n1);
 	unit_normal_vector(p1, p2, n2);
 	unit_normal_vector(p2, p3, n3);
 
-	cout << "n0" << n0[0] << "," << n0[1] << endl;
-	cout << "n1" << n1[0] << "," << n1[1] << endl;
-	cout << "n2" << n2[0] << "," << n2[1] << endl;
-	cout << "n3" << n3[0] << "," << n3[1] << endl;
-
+	
 	float vs1[3];
 	float vs2[3];
 	float vs3[3];
@@ -194,8 +223,6 @@ void get_ptr_pos(float *pt_of_screen_projection, int* ret_val) {
 	//	following part is in the loop
 	convert_to_2d(pt_of_screen_projection, p);
 
-	cout << "p " << p[0] << "," << p[1] << endl;
-
 	subtract_vectors(p, p0, vs1);
 	subtract_vectors(p, p2, vs2);
 	subtract_vectors(p, p0, vs3);
@@ -203,35 +230,23 @@ void get_ptr_pos(float *pt_of_screen_projection, int* ret_val) {
 
 	u = dot_product(vs1, n0);
 	u = u / (u + dot_product(vs2, n2));
-	cout << "u " << u << endl;
-
+	
 	v = dot_product(vs3, n1);
 	v = v / (v + dot_product(vs4, n3));
-	cout << "v " << v << endl;
-
-
+	
 
 	float a = n0[x], b = n0[y], c = -dot_product(p0, n0);
 	float d = n0[x] + n2[x], e = n0[y] + n2[y], f = -dot_product(p0, n0) - dot_product(p2, n2);
 	float g = n1[x], h = n1[y], i = -dot_product(p0, n1);
 	float j = n1[x] + n3[x], k = n1[y] + n3[y], l = -dot_product(p0, n1) - dot_product(p2, n3);
 
-	cout << "u " << u << " f " << f << " c"<< c << endl;
-	cout << "v " << v << " l " << l << " i" << i << endl;
-
+	
 	float uDA = u * (d - a);
 	float uEB = u * (e - b);
 	float uFC = u * (f - c);
 	float vJG = u * (j - g);
 	float vKH = u * (k - h);
 	float vLI = u * (l - i);
-
-	cout << "uDA " << uDA << endl;
-	cout << "uEB " << uEB << endl;
-	cout << "uFC " << uFC << endl;
-	cout << "vJG " << vJG << endl;
-	cout << "vKH " << vKH << endl;
-	cout << "vLI " << vLI << endl;
 
 	cout << (vKH*uFC - vLI * uEB) << endl;
 	cout << (vJG*uEB - vKH * uDA) << endl;
@@ -287,16 +302,6 @@ void initialise_2d() {
 	convert_to_2d(screen_plane_corners[1], screen_in_2d[1]);
 	convert_to_2d(screen_plane_corners[2], screen_in_2d[2]);
 	convert_to_2d(screen_plane_corners[3], screen_in_2d[3]);
-
-	cout << "screen_plane_corners[0] " << screen_plane_corners[0][0] << screen_plane_corners[0][1] << screen_plane_corners[0][2] << endl;
-	cout << "screen_plane_corners[1] " << screen_plane_corners[1][0] << screen_plane_corners[1][1] << screen_plane_corners[1][2] << endl;
-	cout << "screen_plane_corners[2] " << screen_plane_corners[2][0] << screen_plane_corners[2][1] << screen_plane_corners[2][2] << endl;
-	cout << "screen_plane_corners[3] " << screen_plane_corners[3][0] << screen_plane_corners[3][1] << screen_plane_corners[3][2] << endl;
-
-	cout << "screen_in_2d[0][0] " << screen_in_2d[0][0] << "," << screen_in_2d[0][1] << endl;
-	cout << "screen_in_2d[1][0] " << screen_in_2d[1][0] << "," << screen_in_2d[1][1] << endl;
-	cout << "screen_in_2d[2][0] " << screen_in_2d[2][0] << "," << screen_in_2d[2][1] << endl;
-	cout << "screen_in_2d[3][0] " << screen_in_2d[3][0] << "," << screen_in_2d[3][1] << endl;
 
 }
 
@@ -356,17 +361,14 @@ int main()
 			if (!screen_coordinates_configured) {
 				for (;;) {
 
-					std::cout << "Please bring the controller to the top left edge of the screen and press the trigger" << endl;
-					screen_plane_input[0][0] = get_coordinate_trigger_press(device_number);
-					
-					std::cout << "Please bring the controller to the top right edge of the screen and press the trigger" << endl;
-					screen_plane_input[0][1] = get_coordinate_trigger_press(device_number);
-					
 					std::cout << "Please bring the controller to the bottom left edge of the screen and press the trigger" << endl;
-					screen_plane_input[1][0] = get_coordinate_trigger_press(device_number);
-
+					screen_plane_input[0][0] = get_coordinate_trigger_press(device_number);
 					std::cout << "Please bring the controller to the bottom right edge of the screen and press the trigger" << endl;
+					screen_plane_input[0][1] = get_coordinate_trigger_press(device_number);
+					std::cout << "Please bring the controller to the top right edge of the screen and press the trigger" << endl;
 					screen_plane_input[1][1] = get_coordinate_trigger_press(device_number);
+					std::cout << "Please bring the controller to the top left edge of the screen and press the trigger" << endl;
+					screen_plane_input[1][0] = get_coordinate_trigger_press(device_number);
 
 					std::cout << "Press x to recalibrate, otherwise press any key to continue" << endl;
 					char response;
@@ -413,10 +415,10 @@ int main()
 
 				screen_plane_corners[0] = screen_plane_input[0][0];
 				screen_plane_corners[1] = screen_plane_input[0][1];
-				screen_plane_corners[2] = screen_plane_input[1][0];
+				screen_plane_corners[2] = screen_plane_input[1][1];
 
 				float a = screen_plane_adjusted[0], b = screen_plane_adjusted[1], c = screen_plane_adjusted[2], d = screen_plane_adjusted[3];
-				float p = screen_plane_input[1][1][0], q = screen_plane_input[1][1][1], r = screen_plane_input[1][1][2];
+				float p = screen_plane_input[1][0][0], q = screen_plane_input[1][0][1], r = screen_plane_input[1][0][2];
 				float t = (-d - a * p - b * q - c * r) / (a*a + b * b + c * c);
 				screen_plane_corners[3] = new float[3];
 				screen_plane_corners[3][0]= p + a * t;
@@ -698,6 +700,7 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 	int axis_arr[2];
 
 
+	float proj_in_2d[2];
 	VREvent_t event;
 
 	for (;;) {
@@ -715,6 +718,7 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 		tracking_device_mutex.unlock();
 
 
+
 		float a = screen_plane_adjusted[0], b = screen_plane_adjusted[1], c = screen_plane_adjusted[2], d = screen_plane_adjusted[3];
 		if ((tracked_device_pose.bPoseIsValid && tracked_device_pose.bDeviceIsConnected))
 		{
@@ -727,7 +731,6 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 
 			float abs_position[3] = { matrix[0][3], matrix[1][3], matrix[2][3] };// absolute position vector of device;
 			//find direction vector from obtained rotation matrix
-			std::cout << "Device " << device_number << endl << " Controller coordinates(" << abs_position[0] << "," << abs_position[1] << "," << abs_position[2] << ")" << endl;
 			float direction_vector[3] = { (matrix[0][0] + matrix[1][0] + matrix[2][0]) * sqrt_magnitude, (matrix[0][1] + matrix[1][1] + matrix[2][1]) * sqrt_magnitude,(matrix[0][2] + matrix[1][2] + matrix[2][2]) * sqrt_magnitude };
 			//float vector_magnitude = pow(direction_vector[0], 2) + pow(direction_vector[1], 2) + pow(direction_vector[2], 2);
 			
@@ -752,10 +755,10 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 			//map that onto y coordinate
 
 
-			cout << "screen_in_2d2 " << screen_in_2d[0][0] << "," << screen_in_2d[0][1] << endl;
-			cout << "screen_in_2d3 " << screen_in_2d[3][0] << "," << screen_in_2d[3][1] << endl;
+			convert_to_2d(pt_of_screen_projection, proj_in_2d);
 
-			get_ptr_pos(pt_of_screen_projection, axis_arr);
+			Quad_to_Logical_Cell(proj_in_2d[0], proj_in_2d[1],axis_arr);
+			//get_ptr_pos(pt_of_screen_projection, axis_arr);
 
 			cout << "Axis arr" << axis_arr[0] <<"," << axis_arr[1] <<endl;
 
@@ -957,13 +960,7 @@ float **get_rotation_matrix(float f[3], float t[3]) {// rotation of a into b
 		}
 	}
 	//std::cout << "Identity Matrix" << endl;
-	for (int i = 0; i < 3; i++) {
-		for (int j = 0; j < 3; j++) {
-			std::cout << identity[i][j] << " ";
-		}
-		std::cout << endl;
-	}
-
+	
 
 
 	u_hat[0][1] = -v[2];
@@ -978,21 +975,7 @@ float **get_rotation_matrix(float f[3], float t[3]) {// rotation of a into b
 
 	multiplyMatrices(u_hat, u_hat, u_hat_sq);
 	//std::cout << "u_hat Matrix" << endl;
-	for (int i = 0; i < 3; i++) {
-		for (int j = 0; j < 3; j++) {
-			std::cout << u_hat[i][j] << " ";
-		}
-		std::cout << endl;
-	}
-	//std::cout << "u_hat square" << endl;
-	for (int i = 0; i < 3; i++) {
-		for (int j = 0; j < 3; j++) {
-			std::cout << u_hat_sq[i][j] << " ";
-		}
-		std::cout << endl;
-	}
-
-
+	
 
 	matrix_scalar_mult(u_hat_sq, (1 / (1 + c)));
 
