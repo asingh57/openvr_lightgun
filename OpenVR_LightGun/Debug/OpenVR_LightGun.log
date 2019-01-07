@@ -1,19 +1,19 @@
 ﻿  OpenVR_LightGun.cpp
-d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(240): warning C4244: '=': conversion from 'float' to 'int', possible loss of data
-d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(241): warning C4244: '=': conversion from 'float' to 'int', possible loss of data
-d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(264): warning C4244: 'return': conversion from 'double' to 'float', possible loss of data
-d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(369): warning C4244: '=': conversion from 'float' to 'int', possible loss of data
-d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(370): warning C4244: '=': conversion from 'float' to 'int', possible loss of data
-d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(388): warning C4101: 'r2': unreferenced local variable
-d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(392): warning C4101: 'r7': unreferenced local variable
-d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(390): warning C4101: 'r4': unreferenced local variable
-d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(391): warning C4101: 'r6': unreferenced local variable
-d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(389): warning C4101: 'r3': unreferenced local variable
-d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(513): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(828): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(819): warning C4101: 'event': unreferenced local variable
-d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(947): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(1028): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(1029): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-d:\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(1056): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
-  OpenVR_LightGun.vcxproj -> D:\openvr_lightgun\OpenVR_LightGun\Debug\OpenVR_LightGun.exe
+c:\users\abby singh\documents\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(248): warning C4244: '=': conversion from 'float' to 'int', possible loss of data
+c:\users\abby singh\documents\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(249): warning C4244: '=': conversion from 'float' to 'int', possible loss of data
+c:\users\abby singh\documents\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(272): warning C4244: 'return': conversion from 'double' to 'float', possible loss of data
+c:\users\abby singh\documents\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(377): warning C4244: '=': conversion from 'float' to 'int', possible loss of data
+c:\users\abby singh\documents\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(378): warning C4244: '=': conversion from 'float' to 'int', possible loss of data
+c:\users\abby singh\documents\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(396): warning C4101: 'r2': unreferenced local variable
+c:\users\abby singh\documents\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(400): warning C4101: 'r7': unreferenced local variable
+c:\users\abby singh\documents\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(398): warning C4101: 'r4': unreferenced local variable
+c:\users\abby singh\documents\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(399): warning C4101: 'r6': unreferenced local variable
+c:\users\abby singh\documents\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(397): warning C4101: 'r3': unreferenced local variable
+c:\users\abby singh\documents\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(523): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+c:\users\abby singh\documents\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(854): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+c:\users\abby singh\documents\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(845): warning C4101: 'event': unreferenced local variable
+c:\users\abby singh\documents\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(974): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+c:\users\abby singh\documents\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(1055): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+c:\users\abby singh\documents\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(1056): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+c:\users\abby singh\documents\openvr_lightgun\openvr_lightgun\openvr_lightgun.cpp(1083): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+  OpenVR_LightGun.vcxproj -> C:\Users\Abby Singh\Documents\openvr_lightgun\OpenVR_LightGun\Debug\OpenVR_LightGun.exe

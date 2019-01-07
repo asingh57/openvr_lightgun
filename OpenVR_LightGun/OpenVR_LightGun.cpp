@@ -34,7 +34,7 @@ public:
 	~SerialPort();
 
 	int readSerialPort(char *buffer, unsigned int buf_size);
-	bool writeSerialPort(char *buffer, unsigned int buf_size);
+	bool writeSerialPort(int n);
 	bool isConnected();
 };
 
@@ -111,11 +111,19 @@ int SerialPort::readSerialPort(char *buffer, unsigned int buf_size)
 	return 0;
 }
 
-bool SerialPort::writeSerialPort(char *buffer, unsigned int buf_size)
+bool SerialPort::writeSerialPort(int n)
 {
 	DWORD bytesSend;
 
-	if (!WriteFile(this->handler, (void*)buffer, buf_size, &bytesSend, 0)) {
+	unsigned char buffer[4];
+
+	buffer[0] = (n >> 24) & 0xFF;
+	buffer[1] = (n >> 16) & 0xFF;
+	buffer[2] = (n >> 8) & 0xFF;
+	buffer[3] = n & 0xFF;
+
+
+	if (!WriteFile(this->handler, (void*)buffer, 4, &bytesSend, 0)) {
 		ClearCommError(this->handler, &this->errors, &this->status);
 		return false;
 	}
@@ -439,6 +447,8 @@ void back_to_3d(float *vectorx, float *ret_value) {
 
 int main()
 {
+	
+
 	std::cout << "OpenVR_LightGun!\n" << endl;
 	std::cout << (("Driver name: " + driver_name).c_str()) << " ";
 
@@ -550,6 +560,22 @@ int main()
 
 			strcpy_s(char_array, port_str.c_str());
 			arduino[device_number] = new SerialPort(char_array);
+			std::cout << "Make sure your arduino leonardo with arduino_program.ino on it is connected \n" << endl;
+			std::cout << "Arduino Calibration stage. Please make sure you are not moving the mouse until allowed to do so\n" << endl;
+			POINT ptOld;
+			POINT ptNew;
+			std::cout << "Press any key to start" << endl;
+			char rr;
+			cin >> rr;
+			GetCursorPos(&ptOld);
+			//send char signal to serial
+			arduino[device_number]->writeSerialPort(1);
+			Sleep(500);
+			GetCursorPos(&ptNew);
+			arduino[device_number]->writeSerialPort(ptNew.x - ptOld.x);
+			//send it to serial ptNew.x - ptOld.x
+			std::cout << "Calibration complete. You can move your mouse now" << endl;
+
 
 			//TODO: check if valid port here
 			device_number_arr[emulator_count] = device_number;
@@ -884,7 +910,8 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 			//get_ptr_pos(pt_of_screen_projection, axis_arr);
 
 			cout << "Axis arr" << axis_arr[0] <<"," << axis_arr[1] <<endl;
-
+			arduino[device_number]->writeSerialPort(axis_arr[0]);
+			arduino[device_number]->writeSerialPort(axis_arr[1]);
 
 			//TODO: send data to serial
 
