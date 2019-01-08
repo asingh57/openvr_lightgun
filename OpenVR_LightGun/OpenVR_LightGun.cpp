@@ -157,7 +157,7 @@ void GetDesktopResolution(int& horizontal, int& vertical)
 std::mutex end_signal_mutex;
 bool end_signal=false;
 std::mutex tracking_device_mutex;
-float ***screen_plane_input;
+float screen_plane_input[2][2][3];
 
 float screen_plane_adjusted[4]; //form ax,by,cz,d
 float *screen_plane_corners[4];//four corners of the screen plane correspond to the screen
@@ -202,7 +202,7 @@ string tracked_device_type[vr::k_unMaxTrackedDeviceCount];
 
 int init_OpenVR();
 void exit();
-float *get_coordinate_trigger_press(int device_number, float *recv_direction_vector = {});
+float *get_coordinate_trigger_press(int device_number, float* ret_val ,float recv_direction_vector[3]=new float[3]);
 
 
 
@@ -455,11 +455,6 @@ int main()
 
 	bool screen_coordinates_configured = false;
 	
-
-	screen_plane_input = new float**[2];
-	screen_plane_input[0] = new float*[2];
-	screen_plane_input[1] = new float*[2];
-
 	int device_number_arr[64];
 	string com_port_arr[64];
 	if (vr_context != NULL)
@@ -478,13 +473,13 @@ int main()
 				for (;;) {
 
 					std::cout << "Please bring the controller to the bottom left edge of the screen and press the trigger" << endl;
-					screen_plane_input[0][0] = get_coordinate_trigger_press(device_number);
+					get_coordinate_trigger_press(device_number, screen_plane_input[0][0]);
 					std::cout << "Please bring the controller to the bottom right edge of the screen and press the trigger" << endl;
-					screen_plane_input[0][1] = get_coordinate_trigger_press(device_number);
+					get_coordinate_trigger_press(device_number, screen_plane_input[0][1]);
 					std::cout << "Please bring the controller to the top right edge of the screen and press the trigger" << endl;
-					screen_plane_input[1][1] = get_coordinate_trigger_press(device_number);
+					get_coordinate_trigger_press(device_number, screen_plane_input[1][1]);
 					std::cout << "Please bring the controller to the top left edge of the screen and press the trigger" << endl;
-					screen_plane_input[1][0] = get_coordinate_trigger_press(device_number);
+					get_coordinate_trigger_press(device_number, screen_plane_input[1][0]);
 
 					std::cout << "Press x to recalibrate, otherwise press any key to continue" << endl;
 					char response;
@@ -819,7 +814,8 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 	POINT cursor_position;
 	std::cout << "Position controller "+ std::to_string(device_number) +" directly onto the cursor, pointing directly at the tip of the cursor and press trigger";
 	float *direction_vector_cursor_controller = new float[3]; //direction vector of controller
-	float *abs_position_controller_cursor = get_coordinate_trigger_press(device_number, direction_vector_cursor_controller);//x,y,z coordinates
+	float abs_position_controller_cursor[3];
+	get_coordinate_trigger_press(device_number, abs_position_controller_cursor, direction_vector_cursor_controller);//x,y,z coordinates
 	
 	//find rotation matrix between direction vector and screen normal vector
 	float **rotation_matrix = get_rotation_matrix(direction_vector_cursor_controller, screen_normal_unit_vector);
@@ -868,7 +864,7 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 
 			float abs_position[3] = { matrix[0][3], matrix[1][3], matrix[2][3] };// absolute position vector of device;
 			//find direction vector from obtained rotation matrix
-			float direction_vector[3] = { (matrix[0][0] + matrix[1][0] + matrix[2][0]) * sqrt_magnitude, (matrix[0][1] + matrix[1][1] + matrix[2][1]) * sqrt_magnitude,(matrix[0][2] + matrix[1][2] + matrix[2][2]) * sqrt_magnitude };
+			float direction_vector[3] = { (matrix[0][0] + matrix[0][1] + matrix[0][2]) * sqrt_magnitude, (matrix[1][0] + matrix[1][1] + matrix[1][2]) * sqrt_magnitude,(matrix[2][0] + matrix[2][0] + matrix[2][2]) * sqrt_magnitude };
 			//float vector_magnitude = pow(direction_vector[0], 2) + pow(direction_vector[1], 2) + pow(direction_vector[2], 2);
 			
 			cout << "abs_posn"<< abs_position[0] << "," << abs_position[1] << "," << abs_position[2] << endl;
@@ -885,7 +881,7 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 
 
 			float p = abs_position[0], q = abs_position[1], r = abs_position[2];
-			float l = screen_normal_unit_vector[0], m = screen_normal_unit_vector[1], n = screen_normal_unit_vector[2];
+			float l = adjusted_direction_vector[0], m = adjusted_direction_vector[1], n = adjusted_direction_vector[2];
 			float t = (-d - a * p - b * q - c * r) / (a*l + b * m + c * n);
 			pt_of_screen_projection[0] = p + l * t;
 			pt_of_screen_projection[1] = q + m * t;
@@ -911,7 +907,7 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 				
 				deltax = axis_arr[0] - cursor_position.x;
 				deltay = axis_arr[1] - cursor_position.y;
-				if (abs(deltax) > 200 || abs(deltay)>200) {
+				if (abs(deltax) > 2000 || abs(deltay)>2000) {
 					GetCursorPos(&cursor_position);
 				}
 				else {
@@ -949,9 +945,8 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 }
 
 
-float *get_coordinate_trigger_press(int device_number, float *recv_direction_vector) { //get controller coordinates on trigger press 
+float *get_coordinate_trigger_press(int device_number, float *ret_value,float *direction_vector) { //get controller coordinates on trigger press 
 	float *matrix[3];
-	float *ret_value = new float[3];
 	bool ret_defined = false;
 	for (;;) {
 		bool tracking_values_available = false;
@@ -985,15 +980,14 @@ float *get_coordinate_trigger_press(int device_number, float *recv_direction_vec
 						ret_value[1] = matrix[1][3];
 						ret_value[2] = matrix[2][3];
 						float sqrt_magnitude = sqrt(1 / 3.00);
-						float direction_vector[3] = { (matrix[0][0] + matrix[1][0] + matrix[2][0]) * sqrt_magnitude, (matrix[0][1] + matrix[1][1] + matrix[2][1]) * sqrt_magnitude,(matrix[0][2] + matrix[1][2] + matrix[2][2]) * sqrt_magnitude };
-						
-
+						direction_vector[0] = (matrix[0][0] + matrix[1][0] + matrix[2][0]) * sqrt_magnitude;
+						direction_vector[1] = (matrix[0][1] + matrix[1][1] + matrix[2][1]) * sqrt_magnitude;
+						direction_vector[2] = (matrix[0][2] + matrix[1][2] + matrix[2][2]) * sqrt_magnitude;
 						if (!ret_defined) {
 							cout << "Now please release the trigger" << j << endl;
 						}
 						ret_defined = true;
 						
-						recv_direction_vector = direction_vector;
 						vr_context->TriggerHapticPulse(device_number, 0, 300);
 						
 					}
