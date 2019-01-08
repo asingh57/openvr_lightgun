@@ -111,19 +111,15 @@ int SerialPort::readSerialPort(char *buffer, unsigned int buf_size)
 	return 0;
 }
 
-bool SerialPort::writeSerialPort(int n)
+bool SerialPort::writeSerialPort(int number)
 {
 	DWORD bytesSend;
 
-	unsigned char buffer[4];
-
-	buffer[0] = (n >> 24) & 0xFF;
-	buffer[1] = (n >> 16) & 0xFF;
-	buffer[2] = (n >> 8) & 0xFF;
-	buffer[3] = n & 0xFF;
+	std::string s = std::to_string(number);
+	char const *pchar = s.c_str();
 
 
-	if (!WriteFile(this->handler, (void*)buffer, 4, &bytesSend, 0)) {
+	if (!WriteFile(this->handler, pchar, s.length(), &bytesSend, 0)) {
 		ClearCommError(this->handler, &this->errors, &this->status);
 		return false;
 	}
@@ -858,7 +854,7 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 			sizeof(controllerState), &tracked_device_pose);
 		tracking_device_mutex.unlock();
 
-
+		int deltax; int deltay;
 
 		float a = screen_plane_adjusted[0], b = screen_plane_adjusted[1], c = screen_plane_adjusted[2], d = screen_plane_adjusted[3];
 		if ((tracked_device_pose.bPoseIsValid && tracked_device_pose.bDeviceIsConnected))
@@ -872,7 +868,7 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 
 			float abs_position[3] = { matrix[0][3], matrix[1][3], matrix[2][3] };// absolute position vector of device;
 			//find direction vector from obtained rotation matrix
-			float direction_vector[3] = { (matrix[0][0] + matrix[0][1] + matrix[0][2]) * sqrt_magnitude, (matrix[1][0] + matrix[1][1] + matrix[1][2]) * sqrt_magnitude,(matrix[2][0] + matrix[2][1] + matrix[2][2]) * sqrt_magnitude };
+			float direction_vector[3] = { (matrix[0][0] + matrix[1][0] + matrix[2][0]) * sqrt_magnitude, (matrix[0][1] + matrix[1][1] + matrix[2][1]) * sqrt_magnitude,(matrix[0][2] + matrix[1][2] + matrix[2][2]) * sqrt_magnitude };
 			//float vector_magnitude = pow(direction_vector[0], 2) + pow(direction_vector[1], 2) + pow(direction_vector[2], 2);
 			
 			cout << "abs_posn"<< abs_position[0] << "," << abs_position[1] << "," << abs_position[2] << endl;
@@ -889,7 +885,7 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 
 
 			float p = abs_position[0], q = abs_position[1], r = abs_position[2];
-			float l = adjusted_direction_vector[0], m = adjusted_direction_vector[1], n = adjusted_direction_vector[2];
+			float l = screen_normal_unit_vector[0], m = screen_normal_unit_vector[1], n = screen_normal_unit_vector[2];
 			float t = (-d - a * p - b * q - c * r) / (a*l + b * m + c * n);
 			pt_of_screen_projection[0] = p + l * t;
 			pt_of_screen_projection[1] = q + m * t;
@@ -910,22 +906,39 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 			//get_ptr_pos(pt_of_screen_projection, axis_arr);
 
 			cout << "Axis arr" << axis_arr[0] <<"," << axis_arr[1] <<endl;
-			arduino[device_number]->writeSerialPort(axis_arr[0]);
-			arduino[device_number]->writeSerialPort(axis_arr[1]);
+
+			if (axis_arr[0]<=hor_resolution&& axis_arr[1] <= vert_resolution && axis_arr[0]>=0 && axis_arr[1] >= 0) {
+				
+				deltax = axis_arr[0] - cursor_position.x;
+				deltay = axis_arr[1] - cursor_position.y;
+				if (abs(deltax) > 200 || abs(deltay)>200) {
+					GetCursorPos(&cursor_position);
+				}
+				else {
+					arduino[device_number]->writeSerialPort(deltax);
+					arduino[device_number]->writeSerialPort(deltay);
+					Sleep(5);//expected polling rate of 200Hz
+					GetCursorPos(&cursor_position);
+				
+				
+				}
+
+				
+			}
+
 
 			//TODO: send data to serial
 
 			//now map this onto
 			
-			
 
 		}
 
-		
-
 
 		
-		Sleep(1000);//expected polling rate of 200Hz
+		
+		
+
 		if (check_end_signal()) {//if end signal received, end thread
 			std::cout << "thread for device "<< device_number << " ended" << endl;
 			return;

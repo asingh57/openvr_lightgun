@@ -1,9 +1,23 @@
 #include <Mouse.h>
 int x=100,y;
-char inputBuffer[16];
+String inString = "";
 float mult_offset=0;
 int x_sign=1;
 int y_sign=1;
+
+float read_int(){
+  
+  while(Serial.available() == 0){
+    }
+  while(Serial.available()>0){
+      char inChar = Serial.read();
+      inString += inChar;
+      }
+
+   float to_ret=inString.toFloat();
+     inString = "";
+   return to_ret;
+  }
 
 void setup() {
   // put your setup code here, to run once:
@@ -12,58 +26,20 @@ void setup() {
   Serial.setTimeout(0);
   Mouse.begin();
   
-  while(Serial.available() == 0){
-    }
-  while(Serial.available()>0){
-      char i;
-      i=Serial.read();
-      }
+  read_int();//block till signaled
   Mouse.move(x,0);
-  while(Serial.available() == 0){
-    }
-  while(Serial.available()>0){
-      Serial.readBytes(inputBuffer, sizeof(inputBuffer));//get how many pixels were moved
-      mult_offset = 100.0/atof(inputBuffer);// MOUSE PRECISION MUST BE DISABLED FOR THIS TO WORK PROPERLY
-      Serial.println(mult_offset);
-      memset(inputBuffer, 0, sizeof(inputBuffer));
-      }
-
+  mult_offset = 100.0/read_int();
   }
 
 bool set_x=true;
 char char_recv;
 void loop() {
   // put your main code here, to run repeatedly:
-  while(Serial.available() > 0){
+  x=(int)(read_int()*mult_offset);
+  y=(int)(read_int()*mult_offset);
 
-    if(set_x){
-        // A function that reads characters from the serial port into a buffer.
-        Serial.readBytes(inputBuffer, sizeof(inputBuffer));
-    
-        // Convert string to integer
-        // cplusplus.com/reference/cstdlib/atoi/
-        x = atoi(inputBuffer)*mult_offset;
-    
-        // memset clears buffer and updates string length so strlen(inputBuffer) is accurate.
-        memset(inputBuffer, 0, sizeof(inputBuffer));
-        set_x=false;
-      }
-      else{
-        // A function that reads characters from the serial port into a buffer.
-        Serial.readBytes(inputBuffer, sizeof(inputBuffer));
-    
-        // Convert string to integer
-        // cplusplus.com/reference/cstdlib/atoi/
-        y = atoi(inputBuffer)*mult_offset;
-    
-        // memset clears buffer and updates string length so strlen(inputBuffer) is accurate.
-        memset(inputBuffer, 0, sizeof(inputBuffer));
-        set_x=true;
-        Serial.print(x);
-        Serial.print(" ");
-        Serial.println(y);
-        
-        if(x<0){
+  
+          if(x<0){
           x_sign=-1;
           x=-x;
           }
@@ -109,10 +85,5 @@ void loop() {
           }
         
         
-        }
-    
-  }
- 
-  
-  delay(2);  
+        
 }
