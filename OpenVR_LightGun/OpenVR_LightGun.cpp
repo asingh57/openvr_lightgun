@@ -836,6 +836,8 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 	float proj_in_2d[2];
 	VREvent_t event;
 
+	//float angle_val = sqrt(1 / 2);//angle to be rotated by
+	float radians = -3.14159265358979323846 / 3;//acos(angle_val);
 	for (;;) {
 		//button tracking only works when controller plugged in
 
@@ -851,6 +853,9 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 		tracking_device_mutex.unlock();
 
 		int deltax; int deltay;
+
+
+
 
 		float a = screen_plane_adjusted[0], b = screen_plane_adjusted[1], c = screen_plane_adjusted[2], d = screen_plane_adjusted[3];
 		if ((tracked_device_pose.bPoseIsValid && tracked_device_pose.bDeviceIsConnected))
@@ -875,9 +880,17 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 			//adjusted_direction_vector[1] = rotation_matrix[1][0] * direction_vector[0] + rotation_matrix[1][1] * direction_vector[1] + rotation_matrix[1][2] * direction_vector[2];
 			//adjusted_direction_vector[2] = rotation_matrix[2][0] * direction_vector[0] + rotation_matrix[2][1] * direction_vector[1] + rotation_matrix[2][2] * direction_vector[2];
 
-			adjusted_direction_vector[0] = direction_vector[0];
+			//adjusted_direction_vector[0] = direction_vector[0];
+			//adjusted_direction_vector[1] = direction_vector[1];
+			//adjusted_direction_vector[2] = direction_vector[2];
+
+
+			adjusted_direction_vector[0] = direction_vector[0]*cos(radians)+ direction_vector[2]*sin(radians);
 			adjusted_direction_vector[1] = direction_vector[1];
-			adjusted_direction_vector[2] = direction_vector[2];
+			adjusted_direction_vector[2] = -direction_vector[0]*sin(radians)+ direction_vector[2]*cos(radians);
+
+
+
 
 
 			float p = abs_position[0], q = abs_position[1], r = abs_position[2];
@@ -907,10 +920,7 @@ void run_mouse_emulation(int device_number, string com_port) {//controller devic
 				
 				deltax = axis_arr[0] - cursor_position.x;
 				deltay = axis_arr[1] - cursor_position.y;
-				if (abs(deltax) > 2000 || abs(deltay)>2000) {
-					GetCursorPos(&cursor_position);
-				}
-				else {
+				 {
 					arduino[device_number]->writeSerialPort(deltax);
 					arduino[device_number]->writeSerialPort(deltay);
 					Sleep(5);//expected polling rate of 200Hz
