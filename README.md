@@ -9,7 +9,7 @@ Watch a demonstrative video by clicking on the video below: (Apologies for verti
 Compile the arduino_program using the arduino ide onto the Leonardo. Note the COM port of your arduino.
 Disable mouse acceleration on windows by following the instructions [here](https://www.gamingscan.com/how-to-disable-mouse-acceleration-in-windows/)
 
-Setup your Oculus Rift/HTC Vive/any other VR device to the PC, Install SteamVRE, finally compile the OpenVR_LightGun cpp with the windows compiler, run the compiled executable
+Setup your Oculus Rift/HTC Vive/any other VR device to the PC, Install SteamVR, finally compile the OpenVR_LightGun cpp with the windows compiler, run the compiled executable
 Finally, follow the instructions on screen to calibrate and voila!
 
 [Here's how to compile a cpp in Windows](https://docs.microsoft.com/en-us/cpp/build/walkthrough-compiling-a-native-cpp-program-on-the-command-line?view=vs-2019)
