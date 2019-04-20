@@ -3,7 +3,7 @@
 
 This tool allows all openVR supported VR controllers to be emulated as mouse input on a display. Alternatively, they can be used as lighguns for arcade games. You'll need an Arduino Leonardo. The program communicates with the arduino to emulate a mouse/keyboard combo.
 
-Watch the video of this in action below: (Apologies for vertical video)
+Watch a demonstrative video by clicking on the video below: (Apologies for vertical video)
 [![Sample here](https://img.youtube.com/vi/aBct3N1zhEM/maxresdefault.jpg)](https://youtu.be/aBct3N1zhEM)
 
 Compile the arduino_program using the arduino ide onto the Leonardo. Note the COM port of your arduino.
