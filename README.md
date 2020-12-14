@@ -1,3 +1,5 @@
+#note: I wrote this code when I first starting learning C++ in uni. The codebase is terrible and needs to be refined
+
 # openvr_lightgun
 
 
